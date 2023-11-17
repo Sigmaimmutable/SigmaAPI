@@ -33,7 +33,8 @@ public class ImmutabilityUtil {
 		if(pendingNftCount<=0)
 			return;
 		String DOCU_FETCH_SQL = "SELECT * FROM SIGMA_DOCUMENT WHERE TENANT_ID = '"+tId +"' AND NFT_CREATION_STATUS=0 LIMIT "+batchSize+" OFFSET ";
-		int noOfBatches = Math.round(pendingNftCount / batchSize);
+//		int noOfBatches = Math.round(pendingNftCount / batchSize);
+		int noOfBatches = 0;
 		List<BatchJobTask> tasks = new ArrayList<BatchJobTask>();
 		for(int counter = 0; counter <= noOfBatches; counter++) {
 			Integer startIndex = counter * batchSize;

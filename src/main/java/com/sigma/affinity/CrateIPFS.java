@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.apache.commons.io.IOUtils;
@@ -203,6 +204,167 @@ public class CrateIPFS {
     		return new JSONObject();
     	}
     }
+    
+    public JSONObject createIRecSigma(InputStream inputStream, String fileName, PrivateNetwork2 networkById) throws Exception{
+    	try {
+    		LOGGER.info("CrateIPFS.createIRec() iRec creation started for file => "+fileName);
+    	new HttpConnector(null).skipTrustCertificates();
+        String boundary = "------------------------abcdef1234567890";
+        String polyIpfsUrl = networkById.getIpfsUrl()+"add";        
+		String encoded = Base64.getEncoder().encodeToString((networkById.getCreatedByUser() + ":" 
+        + networkById.getNetworkName()).getBytes());
+        HttpURLConnection connection = (HttpURLConnection) new URL(polyIpfsUrl).openConnection(); //v
+        connection.setRequestMethod("POST"); //tr
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        connection.setRequestProperty("Authorization", "Basic "+encoded);
+        OutputStream outputStream = connection.getOutputStream();
+            writeBoundary(outputStream, boundary);
+            writeContentDisposition(outputStream, "file", fileName);
+            writeFile(inputStream, outputStream);
+            writeBoundary(outputStream, boundary, true);
+
+        int responseCode = connection.getResponseCode();
+        String readResponseFromConnection = "" ;
+   	 if(responseCode >=200 && responseCode<300) {
+ 		readResponseFromConnection = readResponseFromConnection(connection);
+ 	} else if(responseCode >=300 && responseCode<500 ){
+ 		readErrorStream(connection);
+ 	 }
+ 	 else
+ 		throw new Exception ("Error response code from web3 responseCode {}" + responseCode);
+   	 	JSONObject jsonResponse = new JSONObject(readResponseFromConnection);
+ //       System.out.println("Response code =>" + responseCode);
+  //      System.out.println("readResponseFromConnection =>"+ readResponseFromConnection);
+        LOGGER.info("CrateIPFS.createIRec() iRec creation complete for file => "+fileName +
+        		"Response code =>" + responseCode +", response ="+readResponseFromConnection);
+        return jsonResponse;
+    	}catch(Exception exception) {
+    		LOGGER.error("CrateIPFS.createIRec() fileHash =>", exception);
+    		return new JSONObject();
+    	}
+    }
+//    public JSONObject createIRecPrivate(InputStream inputStream, String fileName, PrivateNetwork2 networkById, String sessionId, String ipfsUrlPrivate) throws Exception{
+//    	try {
+//            LOGGER.info("Uploading file to private IPFS started for file => " + fileName);
+//            new HttpConnector(null).skipTrustCertificates();
+//
+//            String boundary = "------------------------abcdef1234567890";
+//            String ipfsUrl = ipfsUrlPrivate;
+//
+//            HttpURLConnection connection = (HttpURLConnection) new URL(ipfsUrl).openConnection();
+//            connection.setRequestMethod("POST");
+//            connection.setDoOutput(true);
+//            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+//            
+//            // Set your API key as an authorization header
+////            connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+//
+//            OutputStream outputStream = connection.getOutputStream();
+//            writeBoundary(outputStream, boundary);
+//            writeContentDisposition(outputStream, "file", fileName);
+//            writeFile(inputStream, outputStream);
+//            writeBoundary(outputStream, boundary, true);
+//
+//            int responseCode = connection.getResponseCode();
+//            String readResponseFromConnection = "";
+//
+//            if (responseCode >= 200 && responseCode < 300) {
+//                readResponseFromConnection = readResponseFromConnection(connection);
+//            } else if (responseCode >= 300 && responseCode < 500) {
+//                readErrorStream(connection);
+//            } else {
+//                throw new Exception("Error response code from IPFS API: " + responseCode);
+//            }
+//
+//            JSONObject jsonResponse = new JSONObject(readResponseFromConnection);
+//            LOGGER.info("File uploaded to private IPFS completed for file => " + fileName +
+//                    ", Response code => " + responseCode + ", Response = " + readResponseFromConnection);
+//            return jsonResponse;
+//        } catch (Exception exception) {
+//            LOGGER.error("Error uploading file to private IPFS =>", exception);
+//            return new JSONObject();
+//        }
+//    }
+    
+    public JSONObject createIRecPrivate(InputStream inputStream, String fileName, PrivateNetwork2 networkById, String sessionId, String ipfsUrlPrivate) throws Exception {
+        try {
+            LOGGER.info("Uploading file to private IPFS started for file => " + fileName);
+            new HttpConnector(null).skipTrustCertificates();
+
+            String boundary = "------------------------abcdef1234567890";
+            String ipfsUrl = ipfsUrlPrivate;
+
+            HttpURLConnection connection = (HttpURLConnection) new URL(ipfsUrl).openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            // Set your API key as an authorization header
+            // connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+
+            OutputStream outputStream = connection.getOutputStream();
+            writeBoundary(outputStream, boundary);
+            writeContentDisposition(outputStream, "file", fileName);
+            writeFile(inputStream, outputStream);
+            writeBoundary(outputStream, boundary, true);
+
+            int responseCode = connection.getResponseCode();
+            String readResponseFromConnection = "";
+
+            if (responseCode >= 200 && responseCode < 300) {
+                readResponseFromConnection = readResponseFromConnection(connection);
+
+                // Assuming your response from private IPFS contains a JSON with a field "cid"
+                JSONObject jsonResponse = new JSONObject(readResponseFromConnection);
+                String ipfsCid = jsonResponse.optString("cid");
+                
+                String encodedDestinationPath = URLEncoder.encode(fileName, "UTF-8");
+                
+                // Continue with the next HTTP POST request
+                String apiUrl = "http://13.58.159.144:5001/api/v0/files/cp?arg=/ipfs/" + ipfsCid + "&arg=/" + encodedDestinationPath;
+
+                URL url = new URL(apiUrl);
+
+                HttpURLConnection connection1 = (HttpURLConnection) url.openConnection();
+                connection1.setRequestMethod("POST");
+                connection1.setRequestProperty("Content-Type", "application/json"); // Set content type if needed
+
+                int responseCode1 = connection1.getResponseCode();
+
+                if (responseCode1 >= 200 && responseCode1 < 300) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(connection1.getInputStream()));
+                    String line;
+                    StringBuilder response1 = new StringBuilder();
+                    while ((line = reader.readLine()) != null) {
+                        response1.append(line);
+                    }
+                    reader.close();
+
+                    System.out.println("Response Code: " + responseCode1);
+                    System.out.println("Response Data: " + response1.toString());
+                } else {
+                    System.out.println("Error response code from the second POST request: " + responseCode1);
+                }
+
+                connection1.disconnect();
+
+            } else if (responseCode >= 300 && responseCode < 500) {
+                readErrorStream(connection);
+            } else {
+                throw new Exception("Error response code from IPFS API: " + responseCode);
+            }
+
+            JSONObject jsonResponse = new JSONObject(readResponseFromConnection);
+            LOGGER.info("File uploaded to private IPFS completed for file => " + fileName +
+                    ", Response code => " + responseCode + ", Response = " + jsonResponse.toString());
+
+            return jsonResponse;
+        } catch (Exception exception) {
+            LOGGER.error("Error uploading file to private IPFS =>", exception);
+            return new JSONObject();
+        }
+    }    
     private void writeBoundary(OutputStream outputStream, String boundary) throws IOException {
         writeBoundary(outputStream, boundary, false);
     }

@@ -68,7 +68,7 @@ public class Application  extends SpringBootServletInitializer
 	private Integer noOfBlocksToProcess;
 	@Value("${web3.persist.blocks:true}")
 	private Boolean blocksPersistEnable;	
-	@Value("${sigma.default.batch.size.nft.create:10}")
+	@Value("${sigma.default.batch.size.nft.create:30}")
 	private Integer nftBatchSize;
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -147,7 +147,185 @@ public class Application  extends SpringBootServletInitializer
 	    populateDocumentData1(); // Call the actual method here
 	}
 	
-	public void populateDocumentData() {
+//	public void populateDocumentData() {
+//		LOGGER.info("populateDocumentData started ...");
+//		
+//		try {
+//		DocumentRetrieve documentRetrieve = new DocumentRetrieve();
+//		OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+//		List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+//		for(Organization organization : organizationList) {	
+//			JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+//			boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"DOC_FETCH");
+//			
+//			if(!jobcurrentstatus) {
+//				LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
+//				return;
+//			}
+//			SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+//			List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+//					sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+//			if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+//				LOGGER.info("populateDocumentData existed due to sigmaDocFieldConfigList is empty / null");
+//				continue;
+//			}
+//			String tenantId = organization.getTenantId();
+//			TenantDocSourcePersistence7 tenantDocSourcePersistence7 = new TenantDocSourcePersistence7();
+//			List<TenantDocSource2> organizationList2 = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
+//			for(TenantDocSource2 source : organizationList2) {
+//				if(source.getStatus() != 1)
+//					continue;
+//			//TenantDocSource2 organizationInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
+//			PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//			PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+//			SigmaProps props = new SigmaProps(source.getExtUrl()+"/api/v22.3/auth", source.getExtUrl()+"/api/v22.3/query", 
+//					source.getExtUserName() , source.getExtPassword(), tenantId, true, source.getExtUrl()+"/api/v22.3/objects/documents/");
+//				documentRetrieve.findLatestDocuments(props, jdbcTemplate, organization, sigmaDocFieldConfigList, networkById,"No");
+//			} // tenant doc source
+//			} 
+//		}
+//		catch (Exception e) {
+//			LOGGER.error("Application.populateDocumentData()", e);
+//		}		
+//		LOGGER.info("populateDocumentData completed ...");
+//	}
+	@Value("${sigma.immutable.job.thread.count:3}")
+	private Integer executorThreadCount;
+	
+	@Value("${sigma.run.docfetch.job.enabled:false}")
+	private boolean runFetchJob;
+	
+	@Value("${sigma.run.immutable.job.enabled:false}")
+	private boolean runImmutableJob;
+	
+//    @Scheduled(fixedDelay = 1000*60*30)
+//	public void generateAndPersistNFT()  throws Exception{
+//		LOGGER.info("Generate And Persist NFT started ...");
+////		if(!runImmutableJob) {
+////			LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob = "+runImmutableJob);
+////			return;
+////		}
+//		OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+//		List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+//		DocumentRetrieve documentRet = new DocumentRetrieve();
+//		for(Organization organization : organizationList) {	
+//			JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+//			boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"MAKE_IREC");
+//			
+//			if(!jobcurrentstatus) {
+//				LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob ="+jobcurrentstatus);
+//				return;
+//			}
+//			Long jobid = documentRet.updateJobStatus(0, "P", "", "Started the job !", jdbcTemplate, organization,
+//					true, 1l, "MAKE_IREC","No");
+//			LOGGER.info("Generate And Persist NFT started organization = "+ organization.getTenantId());
+//			SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+//			List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+//					sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+//			if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+//				LOGGER.info("Generate And Persist NFT exited sigmaDocFieldConfigList is empty or null ");
+//				continue;
+//			}
+//			PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//			PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+//			ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
+//			LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
+//			immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
+//					nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
+//			documentRet.updateJobStatus(0, "Y", "", "Job Complete !", jdbcTemplate, organization,
+//					false, jobid, "MAKE_IREC","No");
+//			LOGGER.info("Generate And Persist NFT completed with org id "+ organization.getId());
+//			UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+//			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+//			Date date = new Date();
+//			String formattedStringData = dateFormat.format(date);
+//			
+//			List<String> emailIds = userInfoPersistence.getEmailIdsJobByTennantId(jdbcTemplate,organization.getTenantId(), 10, formattedStringData);
+//
+//			}		
+//		LOGGER.info("Generate And Persist NFT ended ...");
+//		
+//	}
+	
+	 @Scheduled(fixedDelay = 1000*60*30)
+		public void generateAndPersistNFT()  throws Exception{
+			LOGGER.info("Generate And Persist NFT started ...");
+//			if(!runImmutableJob) {
+//				LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob = "+runImmutableJob);
+//				return;
+//			}
+			OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+			List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+			DocumentRetrieve documentRet = new DocumentRetrieve();
+			for(Organization organization : organizationList) {	
+				JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+				boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"MAKE_IREC");
+				
+				if(!jobcurrentstatus) {
+					LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob ="+jobcurrentstatus);
+					continue;
+				}
+				Long jobid = documentRet.updateJobStatus(0, "P", "", "Started the job !", jdbcTemplate, organization,
+						true, 1l, "MAKE_IREC","No");
+				LOGGER.info("Generate And Persist NFT started organization = "+ organization.getTenantId());
+				SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+				List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+						sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+				if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+					LOGGER.info("Generate And Persist NFT exited sigmaDocFieldConfigList is empty or null ");
+					continue;
+				}
+				PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+				PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+				ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
+				LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
+				immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
+						nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
+				documentRet.updateJobStatus(0, "Y", "", "Job Complete !", jdbcTemplate, organization,
+						false, jobid, "MAKE_IREC","No");
+				LOGGER.info("Generate And Persist NFT completed with org id "+ organization.getId());
+				UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+				SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+				Date date = new Date();
+				String formattedStringData = dateFormat.format(date);
+				
+				List<String> emailIds = userInfoPersistence.getEmailIdsJobByTennantId(jdbcTemplate,organization.getTenantId(), 10, formattedStringData);
+
+				}		
+			LOGGER.info("Generate And Persist NFT ended ...");
+			
+		}
+
+//	@PostMapping(value = "/v1/update-delay/{newDelay}")
+//    public ResponseEntity<String> updatePopulateDocumentDelay(@PathVariable("newDelay") Long newDelay) {
+//        if (newDelay != null) {
+//            this.populateDocumentDelay = newDelay;
+//            if (scheduledTask != null) {
+//                scheduledTask.cancel(false);
+//            }
+//            scheduledTask = taskScheduler.scheduleWithFixedDelay(this::populateDocumentData, newDelay);
+//            return ResponseEntity.ok("Populate Document Delay updated successfully to " + newDelay);
+//        } else {
+//            return ResponseEntity.badRequest().body("Invalid value for newDelay.");
+//        }
+//    }
+	 
+	 @PostMapping(value = "/v1/update-delay/{newDelay}")
+	    public ResponseEntity<String> updatePopulateDocumentDelay(@PathVariable("newDelay") Long newDelay) {
+	        if (newDelay != null) {
+	            this.populateDocumentDelay = newDelay;
+	            if (scheduledTask != null) {
+	                scheduledTask.cancel(false);
+	            }
+	            scheduledTask = taskScheduler.scheduleWithFixedDelay(this::populateDocumentDataPrivate, newDelay);
+	            return ResponseEntity.ok("Populate Document Delay updated successfully to " + newDelay);
+	        } else {
+	            return ResponseEntity.badRequest().body("Invalid value for newDelay.");
+	        }
+	    }
+	@Value("${ipfsUrl}")
+    private String ipfsUrl;
+	public void populateDocumentDataPrivate() {
 		LOGGER.info("populateDocumentData started ...");
 		
 		try {
@@ -160,7 +338,7 @@ public class Application  extends SpringBootServletInitializer
 			
 			if(!jobcurrentstatus) {
 				LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
-				return;
+				continue;
 			}
 			SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
 			List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
@@ -180,7 +358,7 @@ public class Application  extends SpringBootServletInitializer
 			PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
 			SigmaProps props = new SigmaProps(source.getExtUrl()+"/api/v22.3/auth", source.getExtUrl()+"/api/v22.3/query", 
 					source.getExtUserName() , source.getExtPassword(), tenantId, true, source.getExtUrl()+"/api/v22.3/objects/documents/");
-				documentRetrieve.findLatestDocuments(props, jdbcTemplate, organization, sigmaDocFieldConfigList, networkById,"No");
+ 				documentRetrieve.findLatestDocumentsPrivate(props, jdbcTemplate, organization, sigmaDocFieldConfigList, networkById,"No",ipfsUrl);
 			} // tenant doc source
 			} 
 		}
@@ -189,76 +367,5 @@ public class Application  extends SpringBootServletInitializer
 		}		
 		LOGGER.info("populateDocumentData completed ...");
 	}
-	@Value("${sigma.immutable.job.thread.count:3}")
-	private Integer executorThreadCount;
-	
-	@Value("${sigma.run.docfetch.job.enabled:false}")
-	private boolean runFetchJob;
-	
-	@Value("${sigma.run.immutable.job.enabled:false}")
-	private boolean runImmutableJob;
-	
-    @Scheduled(fixedDelay = 1000*60*30)
-	public void generateAndPersistNFT()  throws Exception{
-		LOGGER.info("Generate And Persist NFT started ...");
-//		if(!runImmutableJob) {
-//			LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob = "+runImmutableJob);
-//			return;
-//		}
-		OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
-		List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
-		DocumentRetrieve documentRet = new DocumentRetrieve();
-		for(Organization organization : organizationList) {	
-			JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
-			boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"MAKE_IREC");
-			
-			if(!jobcurrentstatus) {
-				LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob ="+jobcurrentstatus);
-				return;
-			}
-			Long jobid = documentRet.updateJobStatus(0, "P", "", "Started the job !", jdbcTemplate, organization,
-					true, 1l, "MAKE_IREC","No");
-			LOGGER.info("Generate And Persist NFT started organization = "+ organization.getTenantId());
-			SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
-			List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
-					sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
-			if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
-				LOGGER.info("Generate And Persist NFT exited sigmaDocFieldConfigList is empty or null ");
-				continue;
-			}
-			PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
-			PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
-			ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
-			LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
-			immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
-					nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
-			documentRet.updateJobStatus(0, "Y", "", "Job Complete !", jdbcTemplate, organization,
-					false, jobid, "MAKE_IREC","No");
-			LOGGER.info("Generate And Persist NFT completed with org id "+ organization.getId());
-			UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
-			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-			Date date = new Date();
-			String formattedStringData = dateFormat.format(date);
-			
-			List<String> emailIds = userInfoPersistence.getEmailIdsJobByTennantId(jdbcTemplate,organization.getTenantId(), 10, formattedStringData);
-
-			}		
-		LOGGER.info("Generate And Persist NFT ended ...");
-		
-	}
-
-	@PostMapping(value = "/v1/update-delay/{newDelay}")
-    public ResponseEntity<String> updatePopulateDocumentDelay(@PathVariable("newDelay") Long newDelay) {
-        if (newDelay != null) {
-            this.populateDocumentDelay = newDelay;
-            if (scheduledTask != null) {
-                scheduledTask.cancel(false);
-            }
-            scheduledTask = taskScheduler.scheduleWithFixedDelay(this::populateDocumentData, newDelay);
-            return ResponseEntity.ok("Populate Document Delay updated successfully to " + newDelay);
-        } else {
-            return ResponseEntity.badRequest().body("Invalid value for newDelay.");
-        }
-    }
    
 } 

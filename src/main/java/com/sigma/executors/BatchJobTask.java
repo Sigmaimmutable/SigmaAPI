@@ -42,11 +42,14 @@ public class BatchJobTask implements Callable<String> {
 			  	for(SigmaDocument documentO : pendingDocumentsBySQL) {
 			  		PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
 			  		JSONObject nftInfo = polygonEdgeUtil.mintNftForDocument(privateNetwork2, documentO, sigmaDocFieldConfigList);
-			  		documentO.setUuid(nftInfo.optString("uuid",""));
+			  		documentO.setUuid(nftInfo.optString("uuid"));
+			  		documentO.setTxnHash(nftInfo.optString("txHash"));
 			  		documentO.setNftCreationStatus(1);
 			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+documentO.getSigmaId()+
 			  				", uuid => "+nftInfo.optString("uuid","Error"));
 			  		sigmaDocumentPersistence5.updateImmutableRecord(documentO, jdbcTemplate);
+			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} waiting for next txn ");
+			  		
 			  	}
 			  	LOGGER.info("Thread {"+ Thread.currentThread()+"} printing completed ");
 			  return "Success";
