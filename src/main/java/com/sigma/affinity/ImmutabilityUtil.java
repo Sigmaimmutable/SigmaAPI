@@ -27,17 +27,19 @@ public class ImmutabilityUtil {
 	private Integer executorThreads = 0;
 
 	public void fetchAndCreateImmutabilityRecords(JdbcTemplate jdbcTemplate,
-			int batchSize, PrivateNetwork2 networkById, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String tId) throws Exception{
+			int batchSize, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String tId) throws Exception{
 		try {
 		Integer pendingNftCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM SIGMA_DOCUMENT WHERE NFT_CREATION_STATUS = 0", Integer.class);
 		if(pendingNftCount<=0)
 			return;
 		String DOCU_FETCH_SQL = "SELECT * FROM SIGMA_DOCUMENT WHERE TENANT_ID = '"+tId +"' AND NFT_CREATION_STATUS=0 LIMIT "+batchSize+" OFFSET ";
-		int noOfBatches = Math.round(pendingNftCount / batchSize);
+//		int noOfBatches = Math.round(pendingNftCount / batchSize);
+		int noOfBatches = 0;
 		List<BatchJobTask> tasks = new ArrayList<BatchJobTask>();
 		for(int counter = 0; counter <= noOfBatches; counter++) {
 			Integer startIndex = counter * batchSize;
 			String finalSQL = DOCU_FETCH_SQL + startIndex;
+			PrivateNetwork2 networkById = null;
 			BatchJobTask batchJobTask = new BatchJobTask(finalSQL, jdbcTemplate, networkById, sigmaDocFieldConfigList);
 			tasks.add(batchJobTask);
 			if(counter * noOfBatches > pendingNftCount)

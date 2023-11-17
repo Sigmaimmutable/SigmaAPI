@@ -21,15 +21,23 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
 
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import javax.xml.bind.DatatypeConverter;
 
+import org.bouncycastle.util.encoders.DecoderException;
+import org.bouncycastle.util.encoders.Hex;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -44,6 +52,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,11 +60,25 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.crypto.Credentials;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.EthCall;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.utils.Numeric;
 
 import com.algo.files.FileSystemStorageService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sigma.affinity.CrateIPFS;
 import com.sigma.affinity.DocumentExtMapper;
 import com.sigma.affinity.DocumentRetrieve;
@@ -89,6 +112,7 @@ import com.sigma.model.ResourceUsage;
 import com.sigma.model.Session;
 import com.sigma.model.SigmaAPIDocConfig;
 import com.sigma.model.SigmaDocument;
+import com.sigma.model.SigmaDocument2;
 import com.sigma.model.SmartContractUsage;
 import com.sigma.model.TenantDocSource2;
 import com.sigma.model.UserInfo;
@@ -115,6 +139,7 @@ import com.sigma.model.db.ResourceUsagePersistence3;
 import com.sigma.model.db.SessionPersistence;
 import com.sigma.model.db.SigmaDocFieldConfigPersistence6;
 import com.sigma.model.db.SigmaDocumentPersistence5;
+import com.sigma.model.db.SigmaDocumentPersistence52;
 import com.sigma.model.db.SigmaProps;
 import com.sigma.model.db.SmartContractTemplateUsagePersistence4;
 import com.sigma.model.db.TenantDocSourcePersistence7;
@@ -137,6 +162,12 @@ public class PlatformResource {
 	private Integer nftBatchSize;
 	@Value("${nft.image.storage.path:/home/usr}")
 	private String nftImageRepositoryLocation;
+	@Value("${ec2IP1}")
+	private String ec2IP1;
+	@Value("${ec2IP2}")
+	private String ec2IP2;
+	@Value("${ec2IP3}")
+	private String ec2IP3;
 	@Autowired
 	private FileSystemStorageService storageService;
 	
@@ -544,7 +575,7 @@ public class PlatformResource {
 		private String nftSmartContractName;
 //		@Value("${sigma.pbc.token:u0b3mfl03e-u1W3TK4W3T0eQkx7VkeFYLA8YYMdmAIN1ZnGcuE/p4s=}")
 //		@Value("${sigma.pbc.token:u0u8yeotu4-32bL666D2KFGsfR0qEP8ZBRb6v+g2L/7wcCwf3n4uck=}")
-		@Value("${sigma.pbc.token:u0flkjpo2c-4MmPccx339y9Cd2bD5OGho0Hmlk+m9BxLiuAB9m4sIU=}")
+		@Value("${sigma.pbc.token:u0zxsde8zd-kQjZeIS/kmv1PbctaXHF+UxB+xhTn4j6/DzjvBJz9gg=}")
 		private String pbcToken;
 		@PostMapping(value = "/v1/network")
 		public ResponseEntity<PrivateNetwork2> generateNetwork(@RequestBody PrivateNetwork2 privateNetwork) throws Exception {
@@ -766,6 +797,70 @@ public class PlatformResource {
 				throw new Exception("Error while getting the location risk result");
 			}
 		}
+//		@Value("${sigma.immutable.job.thread.count:3}")
+//		private Integer executorThreadCount;
+//		@Value("${sigma.run.immutable.job.enabled:false}")
+//		private boolean runImmutableJob;
+//		@PostMapping(value = "/v1/finalisedocs")
+//		public ResponseEntity<String> invokeIRecJobs() throws Exception{
+//			LOGGER.info("Generate And Persist NFT started ...");
+////			Long jobId = 1l;
+////			if(!runImmutableJob) {
+////				LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob = "+runImmutableJob);
+////				return new ResponseEntity<>("Immutable Record job existed as it is disabled !", HttpStatus.OK);
+////			}
+//			ExecutorService executor = Executors.newFixedThreadPool(10);
+//			executor.submit(new Runnable() {					
+//				@Override
+//				public void run() {						
+//			OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+//			List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+//			DocumentRetrieve documentRet = new DocumentRetrieve();
+//			for(Organization organization : organizationList) {	
+//				JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+//				boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"MAKE_IREC");
+//				
+//				if(!jobcurrentstatus) {
+//					LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob ="+jobcurrentstatus);
+//					return;
+//				}
+//				Long jobId= documentRet.updateJobStatus(0, "P", "", "Started the job !", jdbcTemplate, organization,
+//						true, 1l, "MAKE_IREC","Yes");
+//				LOGGER.info("Generate And Persist NFT started organization = "+ organization.getTenantId());
+//				SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+//				List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+//						sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+//				if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+//					LOGGER.info("Generate And Persist NFT exited sigmaDocFieldConfigList is empty or null ");
+//					continue;
+//				}
+//				ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
+//				LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
+//				try {
+//					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+//					immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
+//							nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
+//				} catch (Exception e) {
+//					LOGGER.error("PlatformResource.invokeIRecJobs()", e);
+//				}
+//				documentRet.updateJobStatus(0, "Y", "", "Job Complete !", jdbcTemplate, organization,
+//						false, jobId, "MAKE_IREC","Yes");
+//				LOGGER.info("Generate And Persist NFT completed with org id "+ organization.getId());
+//				UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+//				SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+//				Date date = new Date();
+//				String formattedStringData = dateFormat.format(date);
+//				
+//				List<String> emailIds = userInfoPersistence.getEmailIdsJobByTennantId(jdbcTemplate,organization.getTenantId(), 10, formattedStringData);
+//				}			
+//			LOGGER.info("Generate And Persist NFT ended ...");
+//				}
+//			});				
+//			executor.shutdown();
+//			return new ResponseEntity<>("Immutable Record job initiated successfully !", HttpStatus.OK);
+//		}
+		
 		@Value("${sigma.immutable.job.thread.count:3}")
 		private Integer executorThreadCount;
 		@Value("${sigma.run.immutable.job.enabled:false}")
@@ -791,7 +886,7 @@ public class PlatformResource {
 				
 				if(!jobcurrentstatus) {
 					LOGGER.info("Generate And Persist NFT exited due to  runImmutableJob ="+jobcurrentstatus);
-					return;
+					continue;
 				}
 				Long jobId= documentRet.updateJobStatus(0, "P", "", "Started the job !", jdbcTemplate, organization,
 						true, 1l, "MAKE_IREC","Yes");
@@ -806,10 +901,10 @@ public class PlatformResource {
 				ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
 				LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
 				try {
-					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
-					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+//					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
 					immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
-							nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
+							nftBatchSize, sigmaDocFieldConfigList, organization.getTenantId());
 				} catch (Exception e) {
 					LOGGER.error("PlatformResource.invokeIRecJobs()", e);
 				}
@@ -829,6 +924,7 @@ public class PlatformResource {
 			executor.shutdown();
 			return new ResponseEntity<>("Immutable Record job initiated successfully !", HttpStatus.OK);
 		}
+		
 		/// org
 		@PostMapping(value = "/v1/org")
 		public ResponseEntity<Organization> createOrg(@RequestBody Organization rawOrg) throws Exception {
@@ -1255,6 +1351,212 @@ public class PlatformResource {
 				throw new Exception("Error while getting the location risk result");
 			}
 		}
+		
+		
+		// csv reader
+				@PostMapping(value = "/v1/uploadsigmafieldconfig/{tid}/{mail}")
+				public ResponseEntity<String> uploadSigmaFieldConfig(@RequestParam("file") MultipartFile file, @PathVariable("tid") String id,@PathVariable("mail") String id1) throws Exception {
+					try {
+						InputStream inputStream = file.getInputStream();
+						List<String> configs = new BufferedReader(new InputStreamReader(inputStream,
+							          StandardCharsets.UTF_8)).lines().collect(Collectors.toList());
+						SigmaDocFieldConfigPersistence6 sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+						Organization organizationInfo = new Organization();
+						organizationInfo.setCreatedBy("TEST_ADMIN");
+						organizationInfo.setTenantId(id);
+						Integer fieldCounter = 0;
+						List<SigmaAPIDocConfig> sigmaDocFieldConfigListLocal = new ArrayList<>();
+						for(String config : configs) {
+							String[] split = config.split(",");
+							if(fieldCounter++ == 0)
+								continue;
+							if (split.length == 0) {
+						        // Skip empty or invalid entries
+						        continue;
+						    }
+							String extConfig = split[0];
+							SigmaAPIDocConfig inputConfig = new SigmaAPIDocConfig();
+							inputConfig.setCreatedBy(organizationInfo.getCreatedBy());
+							inputConfig.setSigmaField("fVar"+(fieldCounter-1));//tr v
+							inputConfig.setExtField(extConfig);
+							inputConfig.setStatus("Y");
+							inputConfig.setTenantId(organizationInfo.getTenantId());
+							
+							sigmaDocFieldConfigListLocal.add(inputConfig);
+							
+							int generateDocument = sigmaDocFieldConfigPersistence6.generateDocument(inputConfig, jdbcTemplate);
+							System.out.println(generateDocument);
+							
+						}
+//						Application app = new Application();
+//						app.SinglefileIpfsUpload(file);
+						LOGGER.info("for loop executed");
+						try {
+//							InputStream inputStream = file.getInputStream();
+						DocumentRetrieve documentRetrieve = new DocumentRetrieve();
+						OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+						List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+						for(Organization organization : organizationList) {	
+//							JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+//							boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"DOC_FETCH");
+//							
+//							if(!jobcurrentstatus) {
+//								LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
+//								return;
+//							}
+//							SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+							List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+									sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+							if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+								LOGGER.info("populateDocumentData existed due to sigmaDocFieldConfigList is empty / null");
+								continue;
+							}
+							String tenantId = organization.getTenantId();
+//							TenantDocSourcePersistence7 tenantDocSourcePersistence7 = new TenantDocSourcePersistence7();
+//							List<TenantDocSource2> organizationList2 = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
+//							for(TenantDocSource2 source : organizationList2) {
+//								if(source.getStatus() != 1)
+//									continue;
+							//TenantDocSource2 organizationInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
+							PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+							PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+					
+							
+								String latestDocumentDate = null;
+//								Long jobId = documentRetrieve.updateJobStatus(0, "P",  "", "Started the job !", jdbcTemplate, organization, true, 0l, "DOC_FETCH","No");
+								
+								SigmaDocumentPersistence52 sigmaDocumentPersistence5 = new SigmaDocumentPersistence52();
+								SigmaDocument2 document = new SigmaDocument2();
+								document.setTenantId(tenantId);
+								document.setCreatedBy(organization.getCreatedBy());
+//								document.setJobId(jobId);
+								document.setNftCreationStatus(0);
+								document.setMailId(id1);
+								
+								UUID uuid = UUID.randomUUID();
+						        String uuidAsString = uuid.toString();
+						        document.setUuid(uuidAsString);
+						        
+								InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
+								JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSsingleFile("1", file.getOriginalFilename(),
+										networkById, file, ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
+								String hash = ipfsInfo.optString("createIRec");
+								document.setDocChecksum(hash);		
+							
+							    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
+							    document.setMd5Checksum(md5Checksum);
+							    document.setFileName(file.getOriginalFilename());
+							    sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
+							    
+							    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+								Date date = new Date();
+								String formattedStringData = dateFormat.format(date);
+								latestDocumentDate = formattedStringData;
+//							    documentRetrieve.updateJobStatus(1, "Y",  latestDocumentDate, "No Errors", jdbcTemplate, organization, false, jobId, "DOC_FETCH","No");
+							    
+							    UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+								List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, organization.getTenantId(), 1, latestDocumentDate);
+				
+//					input JSONObject creation
+								JSONObject input = new JSONObject();
+						        
+								input.put("tokenKey", uuidAsString);
+								ObjectMapper mapper = new ObjectMapper();
+								String writeValueAsString =
+										null;
+								try {
+									writeValueAsString = mapper.writeValueAsString(document);
+								} catch (JsonProcessingException e) {
+									LOGGER.error("PolygonEdgeUtil.mintNft() error converting SigmaDocument to json documentO{}", document, e);
+//									return new JSONObject();
+								}
+								JSONObject documentOJson = new JSONObject(writeValueAsString);
+								for(SigmaAPIDocConfig sigmaAPIDocConfig : sigmaDocFieldConfigListLocal) {
+									String sigmaField = sigmaAPIDocConfig.getSigmaField();
+									String targetExtField = documentOJson.optString(sigmaField);
+									input.put(sigmaField, targetExtField);
+									}
+								int sizeOfInput = sigmaDocFieldConfigListLocal.size()+1;
+								for(int counter=sizeOfInput; counter<=10;counter++) {
+									input.put("fVar"+counter, "");
+								}
+								input.put("fVar10", document.getDocChecksum());
+								
+								String mintNftUrl = networkById.getSmartContractAccessUrl()+"contracts"+"/"+ networkById.getSmartContractAddress() +
+										"/mintNFT?kld-from="	+ networkById.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
+								
+								PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
+								JSONObject nftInfo = polygonEdgeUtil.mintNftEthereumSigmacompliance(mintNftUrl, networkById.getCreatedByUser(), networkById.getNetworkName(), input);
+								
+								
+						  		document.setNftCreationStatus(1);
+						  		document.setStatus(nftInfo.optString("txhash","ERROR"));
+						  		
+								LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+document.getSigmaId()+
+						  				", uuid => "+nftInfo.optString("uuid","Error"));
+								
+								sigmaDocumentPersistence5.updateImmutableRecord(document, jdbcTemplate);
+
+
+							
+							} // tenant doc source
+//							} 
+						}
+						catch (Exception e) {
+							LOGGER.error("Application.populateDocumentData()", e);
+						}
+						return new ResponseEntity<String>("Successfully created, use **/v1/sigmafieldconf/{id} to get the config", HttpStatus.OK);
+					} catch (Exception exception) {
+						LOGGER.error("Error while getting the location risk result.", exception);
+						throw new Exception("Error while getting the location risk result");
+					}
+				}
+				
+				//for sigmacomplaincesuite
+				@GetMapping(value = "/v1/sigmadoc2countbytid/{tid}")
+				public ResponseEntity<Integer> getSigmaDoc2CountbyTid(@PathVariable("tid") String id) throws Exception {
+					try {
+						SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+
+						Integer count = sigmaDocumentPersistence52.getSigmaDoc2CountbyTid(jdbcTemplate, id);
+						
+							return new ResponseEntity<Integer>(count, HttpStatus.OK);
+						
+					} catch (Exception exception) {
+						LOGGER.error("Error while getting the location risk result.", exception);
+						throw new Exception("Error while getting the location risk result");
+					}
+				}
+				//sigmacomplaincesuite
+				@GetMapping(value = "/v1/sigmadoc2countbymail/{mail}")
+				public ResponseEntity<Integer> getSigmaDoc2CountbyMail(@PathVariable("mail") String id) throws Exception {
+					try {
+						SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+
+						Integer count = sigmaDocumentPersistence52.getSigmaDoc2CountbyMail(jdbcTemplate, id);
+						
+							return new ResponseEntity<Integer>(count, HttpStatus.OK);
+						
+					} catch (Exception exception) {
+						LOGGER.error("Error while getting the location risk result.", exception);
+						throw new Exception("Error while getting the location risk result");
+					}
+				}
+				//sigmacomplaincesuite
+				@GetMapping(value = "/v1/sigmadoc2bymail/{mail}")
+				public ResponseEntity<List<SigmaDocument2>> getSigmadoc2byMail(@PathVariable("mail") String id) throws Exception {
+					try {
+						SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+						List<SigmaDocument2> generateDocument = sigmaDocumentPersistence52.getDocumentsByMail(jdbcTemplate, id);
+						if(generateDocument != null)
+							return new ResponseEntity<List<SigmaDocument2>>(generateDocument, HttpStatus.OK);
+						else
+							return new ResponseEntity<List<SigmaDocument2>>(new ArrayList<SigmaDocument2>(), HttpStatus.OK);
+					} catch (Exception exception) {
+						LOGGER.error("Error while getting the location risk result.", exception);
+						throw new Exception("Error while getting the location risk result");
+					}
+				}
 	    @PostMapping("/upload")
 	    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
 	        try {
@@ -2239,6 +2541,7 @@ public class PlatformResource {
 		        String iso8601Formatted = dateTime.format(outputFormatter);
 		        System.out.println(iso8601Formatted);
 		        String apiUrl = source.getExtUrl() + "/api/v22.3/query";
+		        //String query = "select id FROM documents where document_creation_date__v >= '" +iso8601Formatted+"'";
 		        String query = "select id FROM documents where file_created_date__v >= '" +iso8601Formatted+"'";
 		        HttpHeaders headers = new HttpHeaders();
 		        headers.set("Authorization", "Bearer " + sessionId);
@@ -2276,4 +2579,190 @@ public class PlatformResource {
 		        throw new Exception("Error while processing the request");
 		    }
 		}
-}
+
+		@GetMapping(value = "/v1/blockstxavalanche/{id}", produces = "application/json")
+		@ResponseBody
+		public String getTransactionsBlocksAvalanche(@PathVariable("id") String id) throws Exception {
+			try {
+				 RestTemplate restTemplate = new RestTemplate();
+			        
+			        // Define the URL
+			        String url = "https://api-testnet.polygonscan.com/api?module=proxy&action=eth_getBlockByNumber&tag="+id+"&boolean=true&apikey=7591ca9e4ccc415faf028b9dff4c7ce2;";
+			        
+			        ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+			        
+			        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+			            return responseEntity.getBody();
+			        } else {
+			            throw new RuntimeException("Failed to fetch data from the API");
+			        }
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+		
+		// blocks tx fetch from Avalanche
+		@CrossOrigin(origins = "http://localhost:3000")
+		@GetMapping(value = "/v1/txpolygon/{id}", produces = "application/json")
+		@ResponseBody
+		public String getTransactionsPolygon(@PathVariable("id") String id ) throws Exception {
+			try {
+				 RestTemplate restTemplate = new RestTemplate();
+			        
+			        // Define the URL
+			        String url = "https://api-testnet.polygonscan.com/api?module=account&action=tokennfttx&contractaddress=0xbc0d6d21b33b96fc4ae34a9c7690fb94db2477a2&address=0xdc61dE4fED82E2CDbC5E31156c4dA41389Ae1e22&page="+id+"&offset=10&startblock=0&endblock=99999999&sort=desc&apikey=7591ca9e4ccc415faf028b9dff4c7ce2";
+			        
+			        ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+			        
+			        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+			            return responseEntity.getBody();
+			        } else {
+			            throw new RuntimeException("Failed to fetch data from the API");
+			        }
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+		// blocks tx fetch from Avalanche
+		@GetMapping(value = "/v1/txInputpolygon/{id}", produces = "application/json")
+		@ResponseBody
+		public String getTransactionInputPolygon(@PathVariable("id") String id) throws Exception {
+			try {
+				 RestTemplate restTemplate = new RestTemplate();
+			        
+			        // Define the URL
+			        String url = "https://api-testnet.polygonscan.com/api?module=proxy&action=eth_getTransactionByHash&txhash="+id+"&apikey=7591ca9e4ccc415faf028b9dff4c7ce2";
+			        
+			        ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+			        
+			        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+			            return responseEntity.getBody();
+			        } else {
+			            throw new RuntimeException("Failed to fetch data from the API");
+			        }
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+
+
+		@GetMapping(value = "/v1/txInputpolygondecode/{id}", produces = "application/json")
+	    @ResponseBody
+	    public String[] getTransactionInputPolygondecode(@PathVariable("id") String id) throws Exception {
+	        try {
+	            RestTemplate restTemplate = new RestTemplate();
+
+	            // Define the URL to get the transaction data
+	            String url = "https://api-testnet.polygonscan.com/api?module=proxy&action=eth_getTransactionByHash&txhash=" + id + "&apikey=7591ca9e4ccc415faf028b9dff4c7ce2";
+
+	            ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+
+	            if (responseEntity.getStatusCode().is2xxSuccessful()) {
+	                String responseData = responseEntity.getBody();
+
+	                // Parse the JSON response to extract the transaction input data (hexadecimal string)
+	                JSONObject jsonResponse = new JSONObject(responseData);
+	                String inputHex = jsonResponse.getJSONObject("result").getString("input");
+
+	                // Remove the "0x" prefix, if present
+	                if (inputHex.startsWith("0x")) {
+	                    inputHex = inputHex.substring(2);
+	                }
+	                String asciiString = new String(DatatypeConverter.parseHexBinary(inputHex), "UTF-8");
+	                String unwantedCharactersRegex = "[^\\w\\s-:,.]"; // Matches any character that is not a word character, '-', ':', ',', or '.'
+
+	                // Replace unwanted characters with commas
+	                asciiString = asciiString.replaceAll(unwantedCharactersRegex, ",");
+	                asciiString = asciiString.replaceAll(",+", ",");
+	   
+	                String[] values = asciiString.split(",");
+	                List<String> resultList = new ArrayList<>();
+	                for (String value : values) {
+	                    if (!value.trim().isEmpty()) {
+	                        resultList.add(value.trim());
+	                    }
+	                }
+
+	                return resultList.toArray(new String[0]);
+	            } else {
+	                throw new RuntimeException("Failed to fetch data from the API");
+	            }
+	        } catch (Exception exception) {
+	            // Handle exceptions
+	            throw exception;
+	        }
+	        
+		}
+		// blocks tx fetch from Algorand
+		@CrossOrigin(origins = "http://localhost:3000")
+		@GetMapping(value = "/v1/txalgorand/{id}", produces = "application/json")
+		@ResponseBody
+		public String getTransactionsAlgorand(@PathVariable("id") String id ) throws Exception {
+		    try {
+		        RestTemplate restTemplate = new RestTemplate();
+		        // Define the URL with a query parameter
+		        String url = "https://testnet-idx.algonode.cloud/v2/accounts/OXYBDVKMSV6R4FFMMF2WMXFGZC6JEUYOKMHK24FYVEWVTNVYPU6VYBP6YI/transactions?tx-type=acfg&sort=-created-at&limit=" + id;
+
+		        ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+
+		        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+		            return responseEntity.getBody();
+		        } else {
+		            throw new RuntimeException("Failed to fetch data from the API");
+		        }
+		    } catch (Exception exception) {
+		        LOGGER.error("Error while getting the location risk result.", exception);
+		        throw new Exception("Error while getting the location risk result");
+		    }
+		}
+
+		@Value("${ipfsUrl}")
+	    private String ipfsUrl;
+		public void populateDocumentDataPrivate() {
+			LOGGER.info("populateDocumentData started ...");
+			
+			try {
+			DocumentRetrieve documentRetrieve = new DocumentRetrieve();
+			OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+			List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+			for(Organization organization : organizationList) {	
+				JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+				boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"DOC_FETCH");
+				
+				if(!jobcurrentstatus) {
+					LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
+					continue;
+				}
+				SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+				List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+						sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+				if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+					LOGGER.info("populateDocumentData existed due to sigmaDocFieldConfigList is empty / null");
+					continue;
+				}
+				String tenantId = organization.getTenantId();
+				TenantDocSourcePersistence7 tenantDocSourcePersistence7 = new TenantDocSourcePersistence7();
+				List<TenantDocSource2> organizationList2 = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
+				for(TenantDocSource2 source : organizationList2) {
+					if(source.getStatus() != 1)
+						continue;
+				//TenantDocSource2 organizationInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
+//				PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//				PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+				SigmaProps props = new SigmaProps(source.getExtUrl()+"/api/v22.3/auth", source.getExtUrl()+"/api/v22.3/query", 
+						source.getExtUserName() , source.getExtPassword(), tenantId, true, source.getExtUrl()+"/api/v22.3/objects/documents/");
+	 				documentRetrieve.findLatestDocumentsPrivate(props, jdbcTemplate, organization, sigmaDocFieldConfigList, "No",ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
+				} // tenant doc source
+				} 
+			}
+			catch (Exception e) {
+				LOGGER.error("Application.populateDocumentData()", e);
+			}		
+			LOGGER.info("populateDocumentData completed ...");
+		}
+		
+	    }
+		
