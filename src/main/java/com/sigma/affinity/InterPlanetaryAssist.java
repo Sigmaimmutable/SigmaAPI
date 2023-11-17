@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 import org.json.JSONObject;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.sigma.model.PrivateNetwork2;
 import com.sigma.model.db.SigmaProps;
@@ -112,5 +113,48 @@ public JSONObject getAndPersistIPFSFile(String docId, String fileName, String se
 		throw new Exception ("Error response code from web3 responseCode {}" + responseCode);
   	 inputStream.close();
   	return result;
+}
+
+public JSONObject getAndPersistIPFSsingleFile(String docId, String fileName, 
+		PrivateNetwork2 networkById,MultipartFile file) throws Exception{ //v tr
+	
+	
+	new HttpConnector(null).skipTrustCertificates(); 
+
+//	URL obj = new URL(props.getExtFileUrl() + docId + "/file"); // v
+
+    JSONObject createIRec = null;
+    CrateIPFS crateIPFS = new CrateIPFS();
+    JSONObject result = new JSONObject();
+
+  	  try (InputStream inputStream = file.getInputStream()) {
+  	// Read the entire stream into a byte array
+  	  ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+  	  byte[] buffer = new byte[4096];
+  	  int bytesRead;
+  	  while ((bytesRead = inputStream.read(buffer)) != -1) {
+  	      byteArrayOutputStream.write(buffer, 0, bytesRead);
+  	  }
+  	  byte[] data = byteArrayOutputStream.toByteArray();
+
+  	  // Calculate MD5 checksum on data
+  	  String md5Checksum = calculateMD5Checksum(data);
+
+  	  // Use data for createIRec
+  	  createIRec = crateIPFS.createIRecSigma(new ByteArrayInputStream(data), fileName, networkById);
+  	    
+  	    //createIRec = crateIPFS.createIRec(inputStream, fileName, networkById, sessionId);	
+  	    result.put("createIRec", createIRec.optString("Hash"));
+  	    
+
+  	   
+        result.put("md5Checksum", md5Checksum);
+  	  }catch (Exception e) {
+          // Handle other exceptions here
+          throw new Exception("An error occurred: " + e.getMessage());
+      }
+//		throw new Exception ("Error response code from web3 responseCode {}");
+		return result;
+  	  
 }
 }

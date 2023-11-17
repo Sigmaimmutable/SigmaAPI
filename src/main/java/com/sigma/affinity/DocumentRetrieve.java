@@ -45,42 +45,36 @@ public class DocumentRetrieve {
 			int testLimit = 100;
 			String docupdated_time=null;
 			for(SigmaDocument document : docs) {
-				if(document.getfVar7()!=null||!document.getfVar7().isEmpty()) {
-					document.setTenantId(props.getTenantId());
-					document.setCreatedBy(org.getCreatedBy());
-					document.setJobId(jobId);
-					document.setNftCreationStatus(0);
-					if(props.getIpfsEnabled()) {
-						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
-						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFile(document.getfVar6(), document.getfVar1(),
-								sessionId, networkById, props);
-						String hash = ipfsInfo.optString("createIRec");
-						document.setDocChecksum(hash);		
-					
-					    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
-					    document.setMd5Checksum(md5Checksum);
-					}
-					sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
-					noOfDocuments ++;
-					docupdated_time=document.getfVar7();
-					if(noOfDocuments > testLimit)
-						break;	
-				}
-				else {
-					noOfDocuments ++;
-				}
+				document.setTenantId(props.getTenantId());
+				document.setCreatedBy(org.getCreatedBy());
+				document.setJobId(jobId);
+				document.setNftCreationStatus(0);
+				if(props.getIpfsEnabled()) {
+					InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
+					JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFile(document.getfVar6(), document.getfVar1(),
+							sessionId, networkById, props);
+					String hash = ipfsInfo.optString("createIRec");
+					document.setDocChecksum(hash);		
 				
-//				LOGGER.info("Persisted the doc {"+document.getId()+"}");						
+				    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
+				    document.setMd5Checksum(md5Checksum);
+				}
+				sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
+				noOfDocuments ++;
+//				docupdated_time=document.getfVar9();
+//				if(noOfDocuments > testLimit)
+//					break;
+				//LOGGER.info("Persisted the doc {"+document.getId()+"}");						
 			}
-		latestDocumentDate=docupdated_time;
+//		latestDocumentDate=docupdated_time;
 
 		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after while noOfDocuments {}"+noOfDocuments, noOfDocuments);
-//		if(latestDocumentDate == null || latestDocumentDate.trim().isEmpty()) {
-//			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-//			Date date = new Date();
-//			String formattedStringData = dateFormat.format(date);
-//			latestDocumentDate = formattedStringData;
-//		}
+		if(latestDocumentDate == null || latestDocumentDate.trim().isEmpty()) {
+			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+			Date date = new Date();
+			String formattedStringData = dateFormat.format(date);
+			latestDocumentDate = formattedStringData;
+		}
 		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() before updateJobStatus ",latestDocumentDate);
 		updateJobStatus(noOfDocuments, "Y",  latestDocumentDate, "No Errors", jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType);
 		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after updateJobStatus ", latestDocumentDate);

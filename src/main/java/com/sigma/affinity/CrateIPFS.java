@@ -203,6 +203,46 @@ public class CrateIPFS {
     		return new JSONObject();
     	}
     }
+    
+    public JSONObject createIRecSigma(InputStream inputStream, String fileName, PrivateNetwork2 networkById) throws Exception{
+    	try {
+    		LOGGER.info("CrateIPFS.createIRec() iRec creation started for file => "+fileName);
+    	new HttpConnector(null).skipTrustCertificates();
+        String boundary = "------------------------abcdef1234567890";
+        String polyIpfsUrl = networkById.getIpfsUrl()+"add";        
+		String encoded = Base64.getEncoder().encodeToString((networkById.getCreatedByUser() + ":" 
+        + networkById.getNetworkName()).getBytes());
+        HttpURLConnection connection = (HttpURLConnection) new URL(polyIpfsUrl).openConnection(); //v
+        connection.setRequestMethod("POST"); //tr
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        connection.setRequestProperty("Authorization", "Basic "+encoded);
+        OutputStream outputStream = connection.getOutputStream();
+            writeBoundary(outputStream, boundary);
+            writeContentDisposition(outputStream, "file", fileName);
+            writeFile(inputStream, outputStream);
+            writeBoundary(outputStream, boundary, true);
+
+        int responseCode = connection.getResponseCode();
+        String readResponseFromConnection = "" ;
+   	 if(responseCode >=200 && responseCode<300) {
+ 		readResponseFromConnection = readResponseFromConnection(connection);
+ 	} else if(responseCode >=300 && responseCode<500 ){
+ 		readErrorStream(connection);
+ 	 }
+ 	 else
+ 		throw new Exception ("Error response code from web3 responseCode {}" + responseCode);
+   	 	JSONObject jsonResponse = new JSONObject(readResponseFromConnection);
+ //       System.out.println("Response code =>" + responseCode);
+  //      System.out.println("readResponseFromConnection =>"+ readResponseFromConnection);
+        LOGGER.info("CrateIPFS.createIRec() iRec creation complete for file => "+fileName +
+        		"Response code =>" + responseCode +", response ="+readResponseFromConnection);
+        return jsonResponse;
+    	}catch(Exception exception) {
+    		LOGGER.error("CrateIPFS.createIRec() fileHash =>", exception);
+    		return new JSONObject();
+    	}
+    }
     private void writeBoundary(OutputStream outputStream, String boundary) throws IOException {
         writeBoundary(outputStream, boundary, false);
     }

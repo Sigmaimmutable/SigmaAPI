@@ -182,7 +182,7 @@ public interface GenericArtefactRetriever {
 					+ "file_modified_date__v,file_created_date__v,document_creation_date__v "
 					//+ "from documents where file_created_date__v >= '2021-12-14T14:11:26.000Z' "
 					+ "from documents "
-					+ "order by file_created_date__v  asc");
+					+ "order by file_created_date__v  desc");
 		else		
 			jsonObject.put("q", "select id, global_id__sys, filename__v,id,version_id,source_owner__v,"
 				+ "source_document_number__v,application__v," //primary_author__c,
@@ -192,7 +192,7 @@ public interface GenericArtefactRetriever {
 				+ "file_modified_date__v,file_created_date__v,document_creation_date__v "
 				//+ "from documents where file_created_date__v >= '2021-12-14T14:11:26.000Z' "
 				+ "from documents where file_created_date__v > '"+previousExecDateTime+"'"
-				+ "order by file_created_date__v  asc");
+				+ "order by file_created_date__v  desc");
 		return jsonObject;
 	}
 }

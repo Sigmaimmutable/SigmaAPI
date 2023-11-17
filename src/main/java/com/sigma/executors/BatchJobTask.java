@@ -47,6 +47,8 @@ public class BatchJobTask implements Callable<String> {
 			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+documentO.getSigmaId()+
 			  				", uuid => "+nftInfo.optString("uuid","Error"));
 			  		sigmaDocumentPersistence5.updateImmutableRecord(documentO, jdbcTemplate);
+			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} waiting for next txn ");
+			  		
 			  	}
 			  	LOGGER.info("Thread {"+ Thread.currentThread()+"} printing completed ");
 			  return "Success";

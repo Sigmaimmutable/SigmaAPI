@@ -7,20 +7,25 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -30,6 +35,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 
+import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -54,8 +60,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.TransactionEncoder;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.utils.Numeric;
 
 import com.algo.files.FileSystemStorageService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sigma.affinity.CrateIPFS;
 import com.sigma.affinity.DocumentExtMapper;
 import com.sigma.affinity.DocumentRetrieve;
@@ -89,6 +112,7 @@ import com.sigma.model.ResourceUsage;
 import com.sigma.model.Session;
 import com.sigma.model.SigmaAPIDocConfig;
 import com.sigma.model.SigmaDocument;
+import com.sigma.model.SigmaDocument2;
 import com.sigma.model.SmartContractUsage;
 import com.sigma.model.TenantDocSource2;
 import com.sigma.model.UserInfo;
@@ -115,6 +139,7 @@ import com.sigma.model.db.ResourceUsagePersistence3;
 import com.sigma.model.db.SessionPersistence;
 import com.sigma.model.db.SigmaDocFieldConfigPersistence6;
 import com.sigma.model.db.SigmaDocumentPersistence5;
+import com.sigma.model.db.SigmaDocumentPersistence52;
 import com.sigma.model.db.SigmaProps;
 import com.sigma.model.db.SmartContractTemplateUsagePersistence4;
 import com.sigma.model.db.TenantDocSourcePersistence7;
@@ -133,7 +158,7 @@ public class PlatformResource {
 	private String web3RpcURl;	
 	@Value("${web3.default.blocks.to.pricess:10}")
 	private Integer noOfBlocksToProcess;
-	@Value("${sigma.default.batch.size.nft.create:10}")
+	@Value("${sigma.default.batch.size.nft.create:30}")
 	private Integer nftBatchSize;
 	@Value("${nft.image.storage.path:/home/usr}")
 	private String nftImageRepositoryLocation;
@@ -1224,8 +1249,8 @@ public class PlatformResource {
 		}
 	
 		// csv reader
-		@PostMapping(value = "/v1/uploadsigmafieldconfig")
-		public ResponseEntity<String> uploadSigmaFieldConfig(@RequestParam("file") MultipartFile file) throws Exception {
+		@PostMapping(value = "/v1/uploadsigmafieldconfig/{tid}/{mail}")
+		public ResponseEntity<String> uploadSigmaFieldConfig(@RequestParam("file") MultipartFile file, @PathVariable("tid") String id,@PathVariable("mail") String id1) throws Exception {
 			try {
 				InputStream inputStream = file.getInputStream();
 				List<String> configs = new BufferedReader(new InputStreamReader(inputStream,
@@ -1233,21 +1258,147 @@ public class PlatformResource {
 				SigmaDocFieldConfigPersistence6 sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
 				Organization organizationInfo = new Organization();
 				organizationInfo.setCreatedBy("TEST_ADMIN");
-				organizationInfo.setTenantId("6ab257b6-4a67-4420-b90b-ef9206919c2f");
+				organizationInfo.setTenantId(id);
 				Integer fieldCounter = 0;
+				List<SigmaAPIDocConfig> sigmaDocFieldConfigListLocal = new ArrayList<>();
 				for(String config : configs) {
 					String[] split = config.split(",");
 					if(fieldCounter++ == 0)
 						continue;
+					if (split.length == 0) {
+				        // Skip empty or invalid entries
+				        continue;
+				    }
 					String extConfig = split[0];
 					SigmaAPIDocConfig inputConfig = new SigmaAPIDocConfig();
 					inputConfig.setCreatedBy(organizationInfo.getCreatedBy());
 					inputConfig.setSigmaField("fVar"+(fieldCounter-1));//tr v
 					inputConfig.setExtField(extConfig);
 					inputConfig.setStatus("Y");
-					inputConfig.setTenantId(organizationInfo.getTenantId());					
+					inputConfig.setTenantId(organizationInfo.getTenantId());
+					
+					sigmaDocFieldConfigListLocal.add(inputConfig);
+					
 					int generateDocument = sigmaDocFieldConfigPersistence6.generateDocument(inputConfig, jdbcTemplate);
 					System.out.println(generateDocument);
+					
+				}
+//				Application app = new Application();
+//				app.SinglefileIpfsUpload(file);
+				LOGGER.info("for loop executed");
+				try {
+//					InputStream inputStream = file.getInputStream();
+				DocumentRetrieve documentRetrieve = new DocumentRetrieve();
+				OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+				List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+				for(Organization organization : organizationList) {	
+//					JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
+//					boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"DOC_FETCH");
+//					
+//					if(!jobcurrentstatus) {
+//						LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
+//						return;
+//					}
+//					SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+					List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+							sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+					if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+						LOGGER.info("populateDocumentData existed due to sigmaDocFieldConfigList is empty / null");
+						continue;
+					}
+					String tenantId = organization.getTenantId();
+//					TenantDocSourcePersistence7 tenantDocSourcePersistence7 = new TenantDocSourcePersistence7();
+//					List<TenantDocSource2> organizationList2 = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
+//					for(TenantDocSource2 source : organizationList2) {
+//						if(source.getStatus() != 1)
+//							continue;
+					//TenantDocSource2 organizationInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
+					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+			
+					
+						String latestDocumentDate = null;
+//						Long jobId = documentRetrieve.updateJobStatus(0, "P",  "", "Started the job !", jdbcTemplate, organization, true, 0l, "DOC_FETCH","No");
+						
+						SigmaDocumentPersistence52 sigmaDocumentPersistence5 = new SigmaDocumentPersistence52();
+						SigmaDocument2 document = new SigmaDocument2();
+						document.setTenantId(tenantId);
+						document.setCreatedBy(organization.getCreatedBy());
+//						document.setJobId(jobId);
+						document.setNftCreationStatus(0);
+						document.setMailId(id1);
+						
+						UUID uuid = UUID.randomUUID();
+				        String uuidAsString = uuid.toString();
+				        document.setUuid(uuidAsString);
+				        
+						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
+						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSsingleFile("1", file.getOriginalFilename(),
+								networkById, file);
+						String hash = ipfsInfo.optString("createIRec");
+						document.setDocChecksum(hash);		
+					
+					    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
+					    document.setMd5Checksum(md5Checksum);
+					    document.setFileName(file.getOriginalFilename());
+					    sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
+					    
+					    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+						Date date = new Date();
+						String formattedStringData = dateFormat.format(date);
+						latestDocumentDate = formattedStringData;
+//					    documentRetrieve.updateJobStatus(1, "Y",  latestDocumentDate, "No Errors", jdbcTemplate, organization, false, jobId, "DOC_FETCH","No");
+					    
+					    UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+						List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, organization.getTenantId(), 1, latestDocumentDate);
+		
+//			input JSONObject creation
+						JSONObject input = new JSONObject();
+				        
+						input.put("tokenKey", uuidAsString);
+						ObjectMapper mapper = new ObjectMapper();
+						String writeValueAsString =
+								null;
+						try {
+							writeValueAsString = mapper.writeValueAsString(document);
+						} catch (JsonProcessingException e) {
+							LOGGER.error("PolygonEdgeUtil.mintNft() error converting SigmaDocument to json documentO{}", document, e);
+//							return new JSONObject();
+						}
+						JSONObject documentOJson = new JSONObject(writeValueAsString);
+						for(SigmaAPIDocConfig sigmaAPIDocConfig : sigmaDocFieldConfigListLocal) {
+							String sigmaField = sigmaAPIDocConfig.getSigmaField();
+							String targetExtField = documentOJson.optString(sigmaField);
+							input.put(sigmaField, targetExtField);
+							}
+						int sizeOfInput = sigmaDocFieldConfigListLocal.size()+1;
+						for(int counter=sizeOfInput; counter<=10;counter++) {
+							input.put("fVar"+counter, "");
+						}
+						input.put("fVar10", document.getDocChecksum());
+						
+						String mintNftUrl = networkById.getSmartContractAccessUrl()+"contracts"+"/"+ networkById.getSmartContractAddress() +
+								"/mintNFT?kld-from="	+ networkById.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
+						
+						PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
+						JSONObject nftInfo = polygonEdgeUtil.mintNftEthereum(mintNftUrl, networkById.getCreatedByUser(), networkById.getNetworkName(), input);
+						
+						
+				  		document.setNftCreationStatus(1);
+				  		document.setStatus(nftInfo.optString("txhash","ERROR"));
+				  		
+						LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+document.getSigmaId()+
+				  				", uuid => "+nftInfo.optString("uuid","Error"));
+						
+						sigmaDocumentPersistence5.updateImmutableRecord(document, jdbcTemplate);
+
+
+					
+					} // tenant doc source
+//					} 
+				}
+				catch (Exception e) {
+					LOGGER.error("Application.populateDocumentData()", e);
 				}
 				return new ResponseEntity<String>("Successfully created, use **/v1/sigmafieldconf/{id} to get the config", HttpStatus.OK);
 			} catch (Exception exception) {
@@ -1255,7 +1406,54 @@ public class PlatformResource {
 				throw new Exception("Error while getting the location risk result");
 			}
 		}
-	    @PostMapping("/upload")
+	    
+		
+		@GetMapping(value = "/v1/sigmadoc2countbytid/{tid}")
+		public ResponseEntity<Integer> getSigmaDoc2CountbyTid(@PathVariable("tid") String id) throws Exception {
+			try {
+				SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+
+				Integer count = sigmaDocumentPersistence52.getSigmaDoc2CountbyTid(jdbcTemplate, id);
+				
+					return new ResponseEntity<Integer>(count, HttpStatus.OK);
+				
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+		
+		@GetMapping(value = "/v1/sigmadoc2countbymail/{mail}")
+		public ResponseEntity<Integer> getSigmaDoc2CountbyMail(@PathVariable("mail") String id) throws Exception {
+			try {
+				SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+
+				Integer count = sigmaDocumentPersistence52.getSigmaDoc2CountbyMail(jdbcTemplate, id);
+				
+					return new ResponseEntity<Integer>(count, HttpStatus.OK);
+				
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+		
+		@GetMapping(value = "/v1/sigmadoc2bymail/{mail}")
+		public ResponseEntity<List<SigmaDocument2>> getSigmadoc2byMail(@PathVariable("mail") String id) throws Exception {
+			try {
+				SigmaDocumentPersistence52 sigmaDocumentPersistence52 = new SigmaDocumentPersistence52();
+				List<SigmaDocument2> generateDocument = sigmaDocumentPersistence52.getDocumentsByMail(jdbcTemplate, id);
+				if(generateDocument != null)
+					return new ResponseEntity<List<SigmaDocument2>>(generateDocument, HttpStatus.OK);
+				else
+					return new ResponseEntity<List<SigmaDocument2>>(new ArrayList<SigmaDocument2>(), HttpStatus.OK);
+			} catch (Exception exception) {
+				LOGGER.error("Error while getting the location risk result.", exception);
+				throw new Exception("Error while getting the location risk result");
+			}
+		}
+
+		@PostMapping("/upload")
 	    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
 	        try {
 	        	if(true)
@@ -2239,7 +2437,7 @@ public class PlatformResource {
 		        String iso8601Formatted = dateTime.format(outputFormatter);
 		        System.out.println(iso8601Formatted);
 		        String apiUrl = source.getExtUrl() + "/api/v22.3/query";
-		        String query = "select id FROM documents where file_created_date__v >= '" +iso8601Formatted+"'";
+		        String query = "select id FROM documents where document_creation_date__v >= '" +iso8601Formatted+"'";
 		        HttpHeaders headers = new HttpHeaders();
 		        headers.set("Authorization", "Bearer " + sessionId);
 		        headers.set("X-VaultAPI-DescribeQuery", "true");
@@ -2276,4 +2474,780 @@ public class PlatformResource {
 		        throw new Exception("Error while processing the request");
 		    }
 		}
+		
+		
+	
+		public long generateNoncevalue() throws Exception {
+			long result = 0L;
+			try {
+	            // Define the API URL
+	        	new HttpConnector(null).skipTrustCertificates();
+	        	
+	            String apiUrl1 = "https://api-sepolia.etherscan.io/api?module=proxy&action=eth_getTransactionCount&address=0xd72558AB56489747360657ab4802176Ce18B49E5&tag=latest&apikey=4QWQ8313REQ2MR2CVINA3V2F8XESXB7CZW";
+	            URL obj = new URL(apiUrl1); // v
+	    	    HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+	         
+	            
+	            // Set the request method to GET
+	            con.setRequestMethod("GET");
+
+	            int responseCode = con.getResponseCode();
+	    	    System.out.println("Response Code : " + responseCode);
+	            
+	    	 // Read the JSON response
+	            ObjectMapper objectMapper = new ObjectMapper();
+	            JsonNode responseJson = objectMapper.readTree(con.getInputStream());
+
+	            // Extract the "result" field
+	            if (responseJson.has("result")) {
+//	                result = responseJson.get("result").asText();
+	            	 String hexNumber = responseJson.get("result").asText();
+	                 result = Long.parseLong(hexNumber.substring(2), 16); 
+	            }
+	            
+	        } catch (Exception e) {
+	            // Handle exceptions
+	            LOGGER.error("HttpConnector.invokeGet()", e);
+//	            return defaultJson;
+	        }
+			return result;
+		}
+		
+		
+		@PostMapping(value = "/v1/mintnft")
+		public long generateNFTMint() throws Exception {
+			String infuraUrl = "https://sepolia.infura.io/v3/886e9a53b5da4f6286230678f7591bde"; // Replace with your Infura URL
+//	        Web3j web3j = Web3j.build(new HttpService(infuraUrl));
+	        Web3j web3 = Web3j.build(new HttpService(infuraUrl)); // Replace with your Ethereum node URL
+
+
+	        String contractAddress = "0xc8e58A17f8dBC4d2142cbD162cb14d394A1B08ab"; // Replace with your contract's address
+	        String abiJson = "[\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"name\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"symbol\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"constructor\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"anonymous\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"owner\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"approved\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"Approval\",\r\n"
+	        		+ "		\"type\": \"event\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"anonymous\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"owner\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"operator\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": false,\r\n"
+	        		+ "				\"internalType\": \"bool\",\r\n"
+	        		+ "				\"name\": \"approved\",\r\n"
+	        		+ "				\"type\": \"bool\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"ApprovalForAll\",\r\n"
+	        		+ "		\"type\": \"event\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"approve\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"tokenKey\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar1\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar2\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar3\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar4\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar5\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar6\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar7\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar8\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar9\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"fVar10\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"mintNFT\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"from\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"safeTransferFrom\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"from\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"bytes\",\r\n"
+	        		+ "				\"name\": \"_data\",\r\n"
+	        		+ "				\"type\": \"bytes\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"safeTransferFrom\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [],\r\n"
+	        		+ "		\"name\": \"savenft\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"value\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"savenftvalue\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"bool\",\r\n"
+	        		+ "				\"name\": \"approved\",\r\n"
+	        		+ "				\"type\": \"bool\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"setApprovalForAll\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"anonymous\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"from\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"indexed\": true,\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"Transfer\",\r\n"
+	        		+ "		\"type\": \"event\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": false,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"from\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"to\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"transferFrom\",\r\n"
+	        		+ "		\"outputs\": [],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"owner\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"balanceOf\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"getApproved\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"tokenKey\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"getNFT\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"components\": [\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"uint256\",\r\n"
+	        		+ "						\"name\": \"tokenId\",\r\n"
+	        		+ "						\"type\": \"uint256\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"address\",\r\n"
+	        		+ "						\"name\": \"tokenOwner\",\r\n"
+	        		+ "						\"type\": \"address\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar1\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar2\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar3\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar4\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar5\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar6\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar7\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar8\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar9\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					},\r\n"
+	        		+ "					{\r\n"
+	        		+ "						\"internalType\": \"string\",\r\n"
+	        		+ "						\"name\": \"fVar10\",\r\n"
+	        		+ "						\"type\": \"string\"\r\n"
+	        		+ "					}\r\n"
+	        		+ "				],\r\n"
+	        		+ "				\"internalType\": \"struct ERC721Full.properties\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"tuple\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"owner\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"operator\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"isApprovedForAll\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"bool\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"bool\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [],\r\n"
+	        		+ "		\"name\": \"name\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"ownerOf\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"bytes4\",\r\n"
+	        		+ "				\"name\": \"interfaceId\",\r\n"
+	        		+ "				\"type\": \"bytes4\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"supportsInterface\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"bool\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"bool\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [],\r\n"
+	        		+ "		\"name\": \"symbol\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"index\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"tokenByIndex\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"address\",\r\n"
+	        		+ "				\"name\": \"owner\",\r\n"
+	        		+ "				\"type\": \"address\"\r\n"
+	        		+ "			},\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"index\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"tokenOfOwnerByIndex\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"tokenId\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"name\": \"tokenURI\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"string\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"string\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	},\r\n"
+	        		+ "	{\r\n"
+	        		+ "		\"constant\": true,\r\n"
+	        		+ "		\"inputs\": [],\r\n"
+	        		+ "		\"name\": \"totalSupply\",\r\n"
+	        		+ "		\"outputs\": [\r\n"
+	        		+ "			{\r\n"
+	        		+ "				\"internalType\": \"uint256\",\r\n"
+	        		+ "				\"name\": \"\",\r\n"
+	        		+ "				\"type\": \"uint256\"\r\n"
+	        		+ "			}\r\n"
+	        		+ "		],\r\n"
+	        		+ "		\"payable\": false,\r\n"
+	        		+ "		\"stateMutability\": \"view\",\r\n"
+	        		+ "		\"type\": \"function\"\r\n"
+	        		+ "	}\r\n"
+	        		+ "]";
+	        String privateKey = "f57987547caaa98bc799c8025178c9396d52c8f6f8d425dc2f379223e9a8d2c4"; // Replace with your private key
+	        
+	        Credentials credentials = Credentials.create(privateKey);
+//	        System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.jks");
+//	        System.setProperty("javax.net.ssl.trustStorePassword", "your_password");
+
+//	        Contract contract = new Contract(abiJson, contractAddress, web3, credentials);
+//	        Contract yourContract = Contract.load(contractAddress, web3, credentials, new DefaultGasProvider());
+	        RawTransactionManager transactionManager = new RawTransactionManager(web3, credentials);
+
+	        String functionName = "mintNFT"; 
+	        List<Type> inputParameters = Arrays.asList(
+	                new Utf8String("tokenKey"),			        		
+	                new Utf8String("fVar1"),
+	                new Utf8String("fVar2"),
+	                new Utf8String("fVar3"),
+	                new Utf8String("fVar4"),
+	                new Utf8String("fVar5"),
+	                new Utf8String("fVar6"),
+	                new Utf8String("fVar7"),
+	                new Utf8String("fVar8"),
+	                new Utf8String("fVar9"),
+	                new Utf8String("fVar10")
+	            );
+	        List<TypeReference<?>> outputParameters = Collections.singletonList(new TypeReference<Type>() {});
+	        
+	        Function function = new Function(
+	                functionName,
+	                inputParameters,
+	                outputParameters
+	            );
+	        String encodedFunction = FunctionEncoder.encode(function);					
+									
+            long nonceValue = generateNoncevalue();
+            BigInteger bigInteger = new BigInteger(Long.toString(nonceValue));			        
+	       	
+	        RawTransaction rawTransaction = RawTransaction.createTransaction(
+	        		bigInteger,
+	                DefaultGasProvider.GAS_PRICE,
+	                DefaultGasProvider.GAS_LIMIT,
+	                contractAddress,
+	                encodedFunction
+//	                BigInteger.ZERO // Value to send with the transaction (usually "0" for function calls)
+	            );
+	        byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
+
+	        // Send the raw transaction
+	        String hexValue = Numeric.toHexString(signedMessage);
+	        try {
+	            String url = "https://sepolia.infura.io/v3/886e9a53b5da4f6286230678f7591bde";
+
+	            // Create an instance of URL and open a connection
+	            URL obj = new URL(url);
+	            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+
+	            // Set the request method to POST
+	            con.setRequestMethod("POST");
+
+	            // Set headers
+	            con.setRequestProperty("Content-Type", "application/json");
+
+	            // Enable input and output streams
+	            con.setDoOutput(true);
+
+	            // Create the JSON request body
+	            String jsonBody = "{\n" +
+	                    "  \"jsonrpc\": \"2.0\",\n" +
+	                    "  \"method\": \"eth_sendRawTransaction\",\n" +
+	                    "  \"params\": [\"" + hexValue + "\"],\n" +
+	                    "  \"id\": 1\n" +
+	                    "}";
+
+	            // Write the JSON request body to the output stream
+	            try (OutputStream os = con.getOutputStream()) {
+	                byte[] input = jsonBody.getBytes("utf-8");
+	                os.write(input, 0, input.length);
+	            }
+
+	            // Get the HTTP response code
+	            int responseCode = con.getResponseCode();
+	            System.out.println("Response Code : " + responseCode);
+
+	            // Read the response content
+	            try (BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+	                String inputLine;
+	                StringBuilder response = new StringBuilder();
+
+	                while ((inputLine = in.readLine()) != null) {
+	                    response.append(inputLine);
+	                }
+
+	                // Print the response content
+	                System.out.println(response.toString());
+	            }
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	        }
+	    
+//	        EthSendTransaction ethSendTransaction = web3.ethSendRawTransaction(hexValue).send();
+   
+	        
+//	        if (!ethSendTransaction.hasError()) {
+//	            System.out.println("Transaction successful! Transaction hash: " + ethSendTransaction.getTransactionHash());
+//	        } else {
+//	            System.out.println("Transaction failed! Error: " + ethSendTransaction.getError().getMessage());
+//	        }
+	        
+			return nonceValue;
+		
+	} 
+
+
+		
 }

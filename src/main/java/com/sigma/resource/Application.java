@@ -68,7 +68,7 @@ public class Application  extends SpringBootServletInitializer
 	private Integer noOfBlocksToProcess;
 	@Value("${web3.persist.blocks:true}")
 	private Boolean blocksPersistEnable;	
-	@Value("${sigma.default.batch.size.nft.create:10}")
+	@Value("${sigma.default.batch.size.nft.create:30}")
 	private Integer nftBatchSize;
 	@Autowired
 	JdbcTemplate jdbcTemplate;

@@ -1,7 +1,15 @@
 package com.sigma.affinity;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.math.BigInteger;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,9 +20,24 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.TransactionEncoder;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.utils.Numeric;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sigma.model.DocumentO;
 import com.sigma.model.ImmutableRec;
@@ -250,7 +273,8 @@ public class PolygonEdgeUtil {
         String uuidAsString = uuid.toString();
 		input.put("tokenKey", uuidAsString);
 		ObjectMapper mapper = new ObjectMapper();
-		String writeValueAsString = null;
+		String writeValueAsString =
+				null;
 		try {
 			writeValueAsString = mapper.writeValueAsString(documentO);
 		} catch (JsonProcessingException e) {
@@ -268,7 +292,8 @@ public class PolygonEdgeUtil {
 			input.put("fVar"+counter, "");
 		}
 		input.put("fVar10", documentO.getDocChecksum());
-		return mintNft(mintNftUrl, userName, password, input);
+	//return mintNft(mintNftUrl, userName, password, input);
+	return mintNftEthereum(mintNftUrl, userName, password, input);
 	}
 	private JSONObject mintNft(String mintNftUrl, String userName, String password, JSONObject input) {
 		JSONObject defaultValue = new JSONObject();
@@ -288,6 +313,827 @@ public class PolygonEdgeUtil {
 			return defaultValue;
 		}
 	}
+	public long generateNoncevalue() throws Exception {
+		long result = 0L;
+
+		try {
+            // Define the API URL
+        	new HttpConnector(null).skipTrustCertificates();
+        	
+            String apiUrl1 = "https://api-testnet.snowtrace.io/api?module=proxy&action=eth_getTransactionCount&address=0xdc61dE4fED82E2CDbC5E31156c4dA41389Ae1e22&tag=latest&apikey=8QXANC66JIGIZITJE5YGMDZT1HMC26487U";
+            URL obj = new URL(apiUrl1); 
+    	    HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+         
+            
+            // Set the request method to GET
+            con.setRequestMethod("GET");
+
+            int responseCode = con.getResponseCode();
+    	    System.out.println("Response Code : " + responseCode);
+            
+    	 // Read the JSON response
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode responseJson = objectMapper.readTree(con.getInputStream());
+
+            // Extract the "result" field
+            if (responseJson.has("result")) {
+//                result = responseJson.get("result").asText();
+            	 String hexNumber = responseJson.get("result").asText();
+                 result = Long.parseLong(hexNumber.substring(2), 16); 
+            }
+            
+        } catch (Exception e) {
+            // Handle exceptions
+            LOGGER.error("HttpConnector.invokeGet()", e);
+//            return defaultJson;
+        }
+		return result;
+	}
+	
+
+	public JSONObject mintNftEthereum(String mintNftUrl, String userName, String password, JSONObject input) {
+		long result = 0L;
+		 JSONObject environmentResponse = new JSONObject();
+		//String infuraUrl = "https://avalanche-fuji.infura.io/v3/7591ca9e4ccc415faf028b9dff4c7ce2"; 
+		 String infuraUrl = "https://avalanche-fuji-c-chain.publicnode.com"; // Replace with your Infura URL
+//        Web3j web3j = Web3j.build(new HttpService(infuraUrl));
+        Web3j web3 = Web3j.build(new HttpService(infuraUrl)); // Replace with your Ethereum node URL
+
+
+        String contractAddress = "0x4f99E91d4839D70f31676F4119e67FfA2bd1f49a"; // Replace with your contract's address
+        String abiJson = "[\r\n"
+        		+ "	{\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"name\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"symbol\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"constructor\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"anonymous\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"owner\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"approved\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"Approval\",\r\n"
+        		+ "		\"type\": \"event\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"anonymous\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"owner\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"operator\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": false,\r\n"
+        		+ "				\"internalType\": \"bool\",\r\n"
+        		+ "				\"name\": \"approved\",\r\n"
+        		+ "				\"type\": \"bool\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"ApprovalForAll\",\r\n"
+        		+ "		\"type\": \"event\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"approve\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"tokenKey\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar1\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar2\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar3\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar4\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar5\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar6\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar7\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar8\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar9\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"fVar10\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"mintNFT\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"from\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"safeTransferFrom\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"from\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"bytes\",\r\n"
+        		+ "				\"name\": \"_data\",\r\n"
+        		+ "				\"type\": \"bytes\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"safeTransferFrom\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [],\r\n"
+        		+ "		\"name\": \"savenft\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"value\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"savenftvalue\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"bool\",\r\n"
+        		+ "				\"name\": \"approved\",\r\n"
+        		+ "				\"type\": \"bool\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"setApprovalForAll\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"anonymous\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"from\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"indexed\": true,\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"Transfer\",\r\n"
+        		+ "		\"type\": \"event\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": false,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"from\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"to\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"transferFrom\",\r\n"
+        		+ "		\"outputs\": [],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"nonpayable\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"owner\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"balanceOf\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"getApproved\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"tokenKey\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"getNFT\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"components\": [\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"uint256\",\r\n"
+        		+ "						\"name\": \"tokenId\",\r\n"
+        		+ "						\"type\": \"uint256\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"address\",\r\n"
+        		+ "						\"name\": \"tokenOwner\",\r\n"
+        		+ "						\"type\": \"address\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar1\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar2\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar3\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar4\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar5\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar6\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar7\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar8\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar9\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					},\r\n"
+        		+ "					{\r\n"
+        		+ "						\"internalType\": \"string\",\r\n"
+        		+ "						\"name\": \"fVar10\",\r\n"
+        		+ "						\"type\": \"string\"\r\n"
+        		+ "					}\r\n"
+        		+ "				],\r\n"
+        		+ "				\"internalType\": \"struct ERC721Full.properties\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"tuple\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"owner\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"operator\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"isApprovedForAll\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"bool\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"bool\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [],\r\n"
+        		+ "		\"name\": \"name\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"ownerOf\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"bytes4\",\r\n"
+        		+ "				\"name\": \"interfaceId\",\r\n"
+        		+ "				\"type\": \"bytes4\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"supportsInterface\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"bool\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"bool\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [],\r\n"
+        		+ "		\"name\": \"symbol\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"index\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"tokenByIndex\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"address\",\r\n"
+        		+ "				\"name\": \"owner\",\r\n"
+        		+ "				\"type\": \"address\"\r\n"
+        		+ "			},\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"index\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"tokenOfOwnerByIndex\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"tokenId\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"name\": \"tokenURI\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"string\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"string\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	},\r\n"
+        		+ "	{\r\n"
+        		+ "		\"constant\": true,\r\n"
+        		+ "		\"inputs\": [],\r\n"
+        		+ "		\"name\": \"totalSupply\",\r\n"
+        		+ "		\"outputs\": [\r\n"
+        		+ "			{\r\n"
+        		+ "				\"internalType\": \"uint256\",\r\n"
+        		+ "				\"name\": \"\",\r\n"
+        		+ "				\"type\": \"uint256\"\r\n"
+        		+ "			}\r\n"
+        		+ "		],\r\n"
+        		+ "		\"payable\": false,\r\n"
+        		+ "		\"stateMutability\": \"view\",\r\n"
+        		+ "		\"type\": \"function\"\r\n"
+        		+ "	}\r\n"
+        		+ "]";
+        String privateKey = "8c8a822798b85b2401632b75804655cc6be30495f03518f057279b4e8083b2b9"; // Replace with your private key
+        
+        Credentials credentials = Credentials.create(privateKey);
+
+        RawTransactionManager transactionManager = new RawTransactionManager(web3, credentials);
+
+        String functionName = "mintNFT"; 
+        List<Utf8String> utf8StringData  = convertJsonToUtf8String(input);
+        List<Type> inputParameters = convertUtf8StringListToTypeList(utf8StringData);
+
+//        List<Type> inputParameters = Arrays.asList(
+//                new Utf8String("tokenKey"),			        		
+//                new Utf8String("fVar1"),
+//                new Utf8String("fVar2"),
+//                new Utf8String("fVar3"),
+//                new Utf8String("fVar4"),
+//                new Utf8String("fVar5"),
+//                new Utf8String("fVar6"),
+//                new Utf8String("fVar7"),
+//                new Utf8String("fVar8"),
+//                new Utf8String("fVar9"),
+//                new Utf8String("fVar10")
+//            );
+        List<TypeReference<?>> outputParameters = Collections.singletonList(new TypeReference<Type>() {});
+        
+        Function function = new Function(
+                functionName,
+                inputParameters,
+                outputParameters
+            );
+        String encodedFunction = FunctionEncoder.encode(function);					
+								
+         
+
+        // Send the raw transaction
+       
+        try {
+     	Thread.sleep(1000*15);        	
+        	result = generateNoncevalue();
+//        	BigInteger nonce = web3.ethGetTransactionCount("0xd72558ab56489747360657ab4802176ce18b49e5", DefaultBlockParameterName.PENDING).send().getTransactionCount();
+
+        	BigInteger bigInteger = new BigInteger(Long.toString(result));
+//        	BigInteger incrementedNonce = bigInteger.add(BigInteger.ONE); 
+        	long chainId = 43113; 
+        	BigInteger gasPrice = BigInteger.valueOf(60000000000L);
+            RawTransaction rawTransaction = RawTransaction.createTransaction(
+            		bigInteger,
+            		gasPrice,
+                    DefaultGasProvider.GAS_LIMIT,
+                    contractAddress,
+                    encodedFunction
+//                    BigInteger.ZERO // Value to send with the transaction (usually "0" for function calls)
+                );
+            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction,chainId,credentials);
+            String hexValue = Numeric.toHexString(signedMessage);
+            //String url = "https://avalanche-fuji.infura.io/v3/7591ca9e4ccc415faf028b9dff4c7ce2";
+            
+            String url ="https://avalanche-fuji-c-chain.publicnode.com";
+            // Create an instance of URL and open a connection
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+
+            // Set the request method to POST
+            con.setRequestMethod("POST");
+
+            // Set headers
+            con.setRequestProperty("Content-Type", "application/json");
+
+            // Enable input and output streams
+            con.setDoOutput(true);
+
+            // Create the JSON request body
+            String jsonBody = "{\n" +
+                    "  \"jsonrpc\": \"2.0\",\n" +
+                    "  \"method\": \"eth_sendRawTransaction\",\n" +
+                    "  \"params\": [\"" + hexValue + "\"],\n" +
+                    "  \"id\": 1\n" +
+                    "}";
+
+            // Write the JSON request body to the output stream
+            try (OutputStream os = con.getOutputStream()) {
+                byte[] input1 = jsonBody.getBytes("utf-8");
+                os.write(input1, 0, input1.length);
+            }
+
+            // Get the HTTP response code
+            int responseCode = con.getResponseCode();
+            System.out.println("Response Code : " + responseCode);
+
+            // Read the response content
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+                String inputLine;
+                StringBuilder response = new StringBuilder();
+
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+
+                // Print the response content
+                System.out.println(response.toString());
+                
+                JSONObject jsonObject = new JSONObject(response.toString().trim());
+//                String hash1 = jsonObject.getString("result");
+                String hash = jsonObject.optString("result","exception");
+               
+                System.out.println(jsonObject);
+                if(response.length() != 0) {
+      				 environmentResponse.put("uuid", input.optString("tokenKey"));
+      				 environmentResponse.put("txhash", hash);
+      			     return environmentResponse;
+      	 }
+           	 
+           			
+           	 
+//                if(!response.isEmpty())
+//                	response.put("uuid", input.optString("tokenKey"));
+//   			    return environmentResponse;
+   		} 
+            
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    
+//        EthSendTransaction ethSendTransaction = web3.ethSendRawTransaction(hexValue).send();
+
+        
+//        if (!ethSendTransaction.hasError()) {
+//            System.out.println("Transaction successful! Transaction hash: " + ethSendTransaction.getTransactionHash());
+//        } else {
+//            System.out.println("Transaction failed! Error: " + ethSendTransaction.getError().getMessage());
+//        }
+        
+		return environmentResponse;
+	}
+	private List<Utf8String> convertJsonToUtf8String(JSONObject input) {
+        List<Utf8String> utf8StringList = new ArrayList<>();
+
+        utf8StringList.add(new Utf8String(input.optString("tokenKey")));
+        utf8StringList.add(new Utf8String(input.optString("fVar1")));
+        utf8StringList.add(new Utf8String(input.optString("fVar2")));
+        utf8StringList.add(new Utf8String(input.optString("fVar3")));
+        utf8StringList.add(new Utf8String(input.optString("fVar4")));
+        utf8StringList.add(new Utf8String(input.optString("fVar5")));
+        utf8StringList.add(new Utf8String(input.optString("fVar6")));
+        utf8StringList.add(new Utf8String(input.optString("fVar7")));
+        utf8StringList.add(new Utf8String(input.optString("fVar8")));
+        utf8StringList.add(new Utf8String(input.optString("fVar9")));
+        utf8StringList.add(new Utf8String(input.optString("fVar10")));
+
+        return utf8StringList;
+    }
+	
+	private List<Type> convertUtf8StringListToTypeList(List<Utf8String> utf8StringList) {
+        List<Type> typeList = new ArrayList<>();
+        typeList.addAll(utf8StringList);
+        return typeList;
+    }
 	private JSONObject getDefaultAddress(String url, String consortiaId, String envId, 
 			String nodeId2, String token2) {
 		try {
