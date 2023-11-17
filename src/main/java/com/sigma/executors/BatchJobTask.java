@@ -41,7 +41,7 @@ public class BatchJobTask implements Callable<String> {
 			  	List<SigmaDocument> pendingDocumentsBySQL = sigmaDocumentPersistence5.getPendingDocumentsBySQL(jdbcTemplate, workSql);
 			  	for(SigmaDocument documentO : pendingDocumentsBySQL) {
 			  		PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
-			  		JSONObject nftInfo = polygonEdgeUtil.mintNftForDocument(privateNetwork2, documentO, sigmaDocFieldConfigList);
+			  		JSONObject nftInfo = polygonEdgeUtil.mintNftForDocument(documentO, sigmaDocFieldConfigList);
 			  		documentO.setUuid(nftInfo.optString("uuid"));
 			  		documentO.setTxnHash(nftInfo.optString("txHash"));
 			  		documentO.setNftCreationStatus(1);

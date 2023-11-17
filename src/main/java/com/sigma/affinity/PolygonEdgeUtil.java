@@ -1,24 +1,23 @@
 package com.sigma.affinity;
 
 import java.io.BufferedReader;
-import java.time.Duration;
+import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import org.bouncycastle.util.encoders.Hex;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -33,22 +32,17 @@ import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.utils.Numeric;
-
+import java.math.BigInteger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hedera.hashgraph.sdk.*;
-
-import java.lang.reflect.Constructor;
-
 import com.sigma.model.DocumentO;
-import com.sigma.model.ImmutableRec;
 import com.sigma.model.InfraBean;
 import com.sigma.model.NodeBean;
 import com.sigma.model.PageRequestBean;
@@ -57,6 +51,7 @@ import com.sigma.model.SigmaAPIDocConfig;
 import com.sigma.model.SigmaDocument;
 import com.sigma.model.db.PrivateNetworkPersistence3;
 import com.sigma.model.db.SigmaDocFieldConfigPersistence6;
+import com.hedera.hashgraph.sdk.*;
 
 public class PolygonEdgeUtil {
 	private static final Logger LOGGER = LoggerFactory.getLogger("com.sigma.affinity.PolygonEdgeUtil");
@@ -235,33 +230,31 @@ public class PolygonEdgeUtil {
 			return null;
 		}
 	}
-	public JSONObject mintNftForDocument(PrivateNetwork2 privateNetwork2,
-			DocumentO documentO) {
+	public JSONObject mintNftForDocument(SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList) {
 		try {
-		String mintNftUrl = privateNetwork2.getSmartContractAccessUrl()+"contracts"+"/"+ privateNetwork2.getSmartContractAddress() +
-				"/mintNFT?kld-from="	+ privateNetwork2.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
-		JSONObject nftInfo = new PolygonEdgeUtil().mintNft(mintNftUrl,
-				privateNetwork2.getCreatedByUser(), privateNetwork2.getNetworkName(), documentO); //v
+//		String mintNftUrl = privateNetwork2.getSmartContractAccessUrl()+"contracts"+"/"+ privateNetwork2.getSmartContractAddress() +
+//				"/mintNFT?kld-from="	+ privateNetwork2.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
+		JSONObject nftInfo = new PolygonEdgeUtil().mintNft(documentO, sigmaDocFieldConfigList); //v
 		return  nftInfo;
 		}catch(Exception exception) {
 			LOGGER.error("Error PolygonEdgeUtil.mintNftForDocument()", exception);
 			return null;
 		}
 	}
-	public JSONObject mintNftForDocument(PrivateNetwork2 privateNetwork2,
-			SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList) {
-		try {
-		String mintNftUrl = privateNetwork2.getSmartContractAccessUrl()+"contracts"+"/"+ privateNetwork2.getSmartContractAddress() +
-				"/mintNFT?kld-from="	+ privateNetwork2.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
-		JSONObject nftInfo = new PolygonEdgeUtil().mintNft(mintNftUrl,
-				privateNetwork2.getCreatedByUser(), privateNetwork2.getNetworkName(), 
-				documentO, sigmaDocFieldConfigList); //v
-		return  nftInfo;
-		}catch(Exception exception) {
-			LOGGER.error("Error PolygonEdgeUtil.mintNftForDocument()", exception);
-			return null;
-		}
-	}
+//	public JSONObject mintNftForDocument(PrivateNetwork2 privateNetwork2,
+//			SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList) {
+//		try {
+//		String mintNftUrl = privateNetwork2.getSmartContractAccessUrl()+"contracts"+"/"+ privateNetwork2.getSmartContractAddress() +
+//				"/mintNFT?kld-from="	+ privateNetwork2.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
+//		JSONObject nftInfo = new PolygonEdgeUtil().mintNft(mintNftUrl,
+//				privateNetwork2.getCreatedByUser(), privateNetwork2.getNetworkName(), 
+//				documentO, sigmaDocFieldConfigList); //v
+//		return  nftInfo;
+//		}catch(Exception exception) {
+//			LOGGER.error("Error PolygonEdgeUtil.mintNftForDocument()", exception);
+//			return null;
+//		}
+//	}
 	private JSONObject mintNft(String mintNftUrl, String userName, String password, 
 			DocumentO documentO) {
 		JSONObject input = new JSONObject();
@@ -274,8 +267,7 @@ public class PolygonEdgeUtil {
 		input.put("globalid", "gid1");
 		return mintNft(mintNftUrl, userName, password, input);
 	}
-	private JSONObject mintNft(String mintNftUrl, String userName, String password, 
-			SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList) throws Exception {
+	private JSONObject mintNft(SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList) throws Exception {
 		JSONObject input = new JSONObject();
         UUID uuid = UUID.randomUUID();
         String uuidAsString = uuid.toString();
@@ -304,7 +296,7 @@ public class PolygonEdgeUtil {
 		input.put("fVar10", documentO.getDocChecksum());
         input.put("fVar11", documentO.getMd5Checksum());
 	//return mintNft(mintNftUrl, userName, password, input);
-	return mintNftHedera(mintNftUrl, userName, password, input);
+	return mintNftHedera(input);
 	}
 	private JSONObject mintNft(String mintNftUrl, String userName, String password, JSONObject input) {
 		JSONObject defaultValue = new JSONObject();
@@ -361,80 +353,6 @@ public class PolygonEdgeUtil {
 		return result;
 	}
 	
-    public static String[] convertJsonToStringArray(JSONObject jsonObject) {
-        JSONArray keys = jsonObject.names();
-        String[] stringArray = new String[keys.length()];
-        for (int i = 0; i < keys.length(); i++) {
-            String key = keys.getString(i);
-            String value = jsonObject.getString(key);
-            stringArray[i] = value;
-        }
-        return stringArray;
-    }
-	
-	public static JSONObject mintNftHedera(String mintNftUrl, String userName, String password, JSONObject input) throws Exception {
-	    // Replace with your Hedera network and account information
-	    String hederaUrl = "https://testnet.mirrornode.hedera.com/api/v1";
-	    String privateKeyStr = "3030020100300706052b8104000a04220420634a86473156c59bee9767b21fdda8052d6a0fc26211b92c1acdb27c1d659656";
-	    PrivateKey privateKey = PrivateKey.fromString(privateKeyStr);
-	    AccountId operatorId = AccountId.fromString("0.0.5701067");
-	    ContractId contractId = ContractId.fromString("0.0.5706270");
-	    System.out.println("input: " + input);
-	    // Pre-configured client for test network (testnet)
-	    Client client = Client.forTestnet();
-	    client.setOperator(operatorId, privateKey);
-	    
-        AccountBalance balance = new AccountBalanceQuery()
-                .setAccountId(operatorId)
-                .execute(client);
-
-        // Print the balance in tinybars
-        System.out.println("Balance: " + balance.hbars.toTinybars() + " tinybars");
-
-        // If you want the balance in hbars (1 hbar = 100,000,000 tinybars)
-        System.out.println("Balance in hbars: " + balance.hbars);
-
-	    // Create a single transaction for all executions
-        ContractExecuteTransaction transaction = new ContractExecuteTransaction()
-                .setContractId(contractId)
-                .setGas(1000000)
-                .setFunction("mintNFT", new ContractFunctionParameters()
-                        .addStringArray(convertJsonToStringArray(input)));
-
-	    transaction.freezeWith(client);
-	    
-	    TransactionResponse hash = null;
-
-	    try {
-	        // Sign the transaction
-	        transaction.sign(privateKey);
-
-	        // Execute the transaction and get the response
-	        TransactionResponse txResponse = transaction.execute(client);
-	        System.out.println("The transaction Response is " + txResponse);
-	        // Request the receipt of the transaction
-	        TransactionReceipt receipt = txResponse.getReceipt(client);
-	        
-	        System.out.println("The transaction receipt is " + receipt);
-
-	        // Get the transaction consensus status
-	        Status transactionStatus = receipt.status;
-	        
-	        hash = txResponse;
-	        
-	        System.out.println("The hash is " + txResponse.transactionId);
-
-	        System.out.println("The transaction consensus status is " + transactionStatus);
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-
-	    // Update the environment response
-	    JSONObject environmentResponse = new JSONObject();
-	    environmentResponse.put("uuid", input.optString("tokenKey"));
-	    environmentResponse.put("txHash", (hash.transactionId).toString());
-	    return environmentResponse;
-	}
 
 	private JSONObject mintNftEthereum(String mintNftUrl, String userName, String password, JSONObject input) {
 		long result = 0L;
@@ -1107,10 +1025,8 @@ public class PolygonEdgeUtil {
                 // Print the response content
                 System.out.println(response.toString());
                 JSONObject jsonObject = new JSONObject(response.toString().trim());
-                System.out.println("jsonObject"+ jsonObject);
 //              String hash1 = jsonObject.getString("result");
               String hash = jsonObject.optString("result","exception");
-              System.out.println("hash"+ hash);
 //                try {
 //                    if (response != null) {
 //                        String uuid = input.optString("tokenKey");
@@ -1152,7 +1068,81 @@ public class PolygonEdgeUtil {
         
 		return environmentResponse;
 	}
+
+    public static String[] convertJsonToStringArray(JSONObject jsonObject) {
+        JSONArray keys = jsonObject.names();
+        String[] stringArray = new String[keys.length()];
+        for (int i = 0; i < keys.length(); i++) {
+            String key = keys.getString(i);
+            String value = jsonObject.getString(key);
+            stringArray[i] = value;
+        }
+        return stringArray;
+    }
 	
+	public static JSONObject mintNftHedera(JSONObject input) throws Exception {
+	    // Replace with your Hedera network and account information
+	    String hederaUrl = "https://testnet.mirrornode.hedera.com/api/v1";
+	    String privateKeyStr = "3030020100300706052b8104000a04220420634a86473156c59bee9767b21fdda8052d6a0fc26211b92c1acdb27c1d659656";
+	    PrivateKey privateKey = PrivateKey.fromString(privateKeyStr);
+	    AccountId operatorId = AccountId.fromString("0.0.5701067");
+	    ContractId contractId = ContractId.fromString("0.0.5706270");
+	    System.out.println("input: " + input);
+	    // Pre-configured client for test network (testnet)
+	    Client client = Client.forTestnet();
+	    client.setOperator(operatorId, privateKey);
+	    
+        AccountBalance balance = new AccountBalanceQuery()
+                .setAccountId(operatorId)
+                .execute(client);
+
+        // Print the balance in tinybars
+        System.out.println("Balance: " + balance.hbars.toTinybars() + " tinybars");
+
+        // If you want the balance in hbars (1 hbar = 100,000,000 tinybars)
+        System.out.println("Balance in hbars: " + balance.hbars);
+
+	    // Create a single transaction for all executions
+        ContractExecuteTransaction transaction = new ContractExecuteTransaction()
+                .setContractId(contractId)
+                .setGas(1000000)
+                .setFunction("mintNFT", new ContractFunctionParameters()
+                        .addStringArray(convertJsonToStringArray(input)));
+
+	    transaction.freezeWith(client);
+	    
+	    TransactionResponse hash = null;
+
+	    try {
+	        // Sign the transaction
+	        transaction.sign(privateKey);
+
+	        // Execute the transaction and get the response
+	        TransactionResponse txResponse = transaction.execute(client);
+	        System.out.println("The transaction Response is " + txResponse);
+	        // Request the receipt of the transaction
+	        TransactionReceipt receipt = txResponse.getReceipt(client);
+	        
+	        System.out.println("The transaction receipt is " + receipt);
+
+	        // Get the transaction consensus status
+	        Status transactionStatus = receipt.status;
+	        
+	        hash = txResponse;
+	        
+	        System.out.println("The hash is " + txResponse.transactionId);
+
+	        System.out.println("The transaction consensus status is " + transactionStatus);
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+
+	    // Update the environment response
+	    JSONObject environmentResponse = new JSONObject();
+	    environmentResponse.put("uuid", input.optString("tokenKey"));
+	    environmentResponse.put("txHash", (hash.transactionId).toString());
+	    return environmentResponse;
+	}
 	
 	public JSONObject mintNftEthereumSigmacompliance(String mintNftUrl, String userName, String password, JSONObject input) {
 		long result = 0L;

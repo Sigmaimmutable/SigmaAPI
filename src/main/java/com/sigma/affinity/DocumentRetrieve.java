@@ -99,9 +99,33 @@ public class DocumentRetrieve {
 			updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType) ;
 		}
 	}
+	public Long updateJobStatus(int noOfRecords, String jobRunStatus, 
+			String latestDocumentDate2, String stackTrace, JdbcTemplate jdbcTemplate, 
+			Organization org, boolean insertFlag, Long jobId, String jobName, String jobType) {
+		Long generateJobStatus = 0l;
+		JobOPersistence5 persistence = new JobOPersistence5();
+		DocumentO2Job job = new DocumentO2Job();
+		if(insertFlag) {
+			job.setCompanyCode(org.getName());
+			job.setJobRunByUser(org.getCreatedBy()+"_ADMIN");
+			job.setJobName(jobName);
+			job.setTenantId(org.getTenantId());
+			job.setStatus("P");
+			generateJobStatus = persistence.generateJobStatus(job, jdbcTemplate, jobType);
+		}
+		else {
+			job.setId(jobId);		
+			job.setErrorSummary(stackTrace);
+			job.setNoOfRecordsProcessed(noOfRecords);
+			job.setStatus(jobRunStatus);
+			job.setLatestDocumentDate(latestDocumentDate2);
+			persistence.updateJobStatus(job, jdbcTemplate);
+		}
+		return generateJobStatus;
+	}
 	
 	public void findLatestDocumentsPrivate(SigmaProps props, JdbcTemplate jdbcTemplate,
-			Organization org, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, PrivateNetwork2 networkById, String jobType, String ipfsUrl) throws Exception, JsonProcessingException, JsonMappingException {
+			Organization org, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String jobType, String ipfsUrl,String ec2IP1, String ec2IP2, String ec2IP3) throws Exception, JsonProcessingException, JsonMappingException {
 		String latestDocumentDate = null;
 		Integer noOfDocuments = 0;
 		Long jobId = 0l;
@@ -127,7 +151,7 @@ public class DocumentRetrieve {
 					if(props.getIpfsEnabled()) {
 						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
 						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFilePrivate(document.getfVar6(), document.getfVar1(),
-								sessionId, networkById, props,ipfsUrl);
+								sessionId, props, ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
 						String hash = ipfsInfo.optString("createIRec");
 						document.setDocChecksum(hash);		
 					
@@ -173,30 +197,4 @@ public class DocumentRetrieve {
 			updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType) ;
 		}
 	}
-
-	public Long updateJobStatus(int noOfRecords, String jobRunStatus, 
-			String latestDocumentDate2, String stackTrace, JdbcTemplate jdbcTemplate, 
-			Organization org, boolean insertFlag, Long jobId, String jobName, String jobType) {
-		Long generateJobStatus = 0l;
-		JobOPersistence5 persistence = new JobOPersistence5();
-		DocumentO2Job job = new DocumentO2Job();
-		if(insertFlag) {
-			job.setCompanyCode(org.getName());
-			job.setJobRunByUser(org.getCreatedBy()+"_ADMIN");
-			job.setJobName(jobName);
-			job.setTenantId(org.getTenantId());
-			job.setStatus("P");
-			generateJobStatus = persistence.generateJobStatus(job, jdbcTemplate, jobType);
-		}
-		else {
-			job.setId(jobId);		
-			job.setErrorSummary(stackTrace);
-			job.setNoOfRecordsProcessed(noOfRecords);
-			job.setStatus(jobRunStatus);
-			job.setLatestDocumentDate(latestDocumentDate2);
-			persistence.updateJobStatus(job, jdbcTemplate);
-		}
-		return generateJobStatus;
-	}
-	
 }

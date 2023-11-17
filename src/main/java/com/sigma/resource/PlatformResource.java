@@ -162,6 +162,12 @@ public class PlatformResource {
 	private Integer nftBatchSize;
 	@Value("${nft.image.storage.path:/home/usr}")
 	private String nftImageRepositoryLocation;
+	@Value("${ec2IP1}")
+	private String ec2IP1;
+	@Value("${ec2IP2}")
+	private String ec2IP2;
+	@Value("${ec2IP3}")
+	private String ec2IP3;
 	@Autowired
 	private FileSystemStorageService storageService;
 	
@@ -569,7 +575,7 @@ public class PlatformResource {
 		private String nftSmartContractName;
 //		@Value("${sigma.pbc.token:u0b3mfl03e-u1W3TK4W3T0eQkx7VkeFYLA8YYMdmAIN1ZnGcuE/p4s=}")
 //		@Value("${sigma.pbc.token:u0u8yeotu4-32bL666D2KFGsfR0qEP8ZBRb6v+g2L/7wcCwf3n4uck=}")
-		@Value("${sigma.pbc.token:u0flkjpo2c-4MmPccx339y9Cd2bD5OGho0Hmlk+m9BxLiuAB9m4sIU=}")
+		@Value("${sigma.pbc.token:u0zxsde8zd-kQjZeIS/kmv1PbctaXHF+UxB+xhTn4j6/DzjvBJz9gg=}")
 		private String pbcToken;
 		@PostMapping(value = "/v1/network")
 		public ResponseEntity<PrivateNetwork2> generateNetwork(@RequestBody PrivateNetwork2 privateNetwork) throws Exception {
@@ -791,10 +797,10 @@ public class PlatformResource {
 				throw new Exception("Error while getting the location risk result");
 			}
 		}
-		@Value("${sigma.immutable.job.thread.count:3}")
-		private Integer executorThreadCount;
-		@Value("${sigma.run.immutable.job.enabled:false}")
-		private boolean runImmutableJob;
+//		@Value("${sigma.immutable.job.thread.count:3}")
+//		private Integer executorThreadCount;
+//		@Value("${sigma.run.immutable.job.enabled:false}")
+//		private boolean runImmutableJob;
 //		@PostMapping(value = "/v1/finalisedocs")
 //		public ResponseEntity<String> invokeIRecJobs() throws Exception{
 //			LOGGER.info("Generate And Persist NFT started ...");
@@ -855,7 +861,10 @@ public class PlatformResource {
 //			return new ResponseEntity<>("Immutable Record job initiated successfully !", HttpStatus.OK);
 //		}
 		
-		
+		@Value("${sigma.immutable.job.thread.count:3}")
+		private Integer executorThreadCount;
+		@Value("${sigma.run.immutable.job.enabled:false}")
+		private boolean runImmutableJob;
 		@PostMapping(value = "/v1/finalisedocs")
 		public ResponseEntity<String> invokeIRecJobs() throws Exception{
 			LOGGER.info("Generate And Persist NFT started ...");
@@ -892,10 +901,10 @@ public class PlatformResource {
 				ImmutabilityUtil immutabilityUtil = new ImmutabilityUtil(executorThreadCount);
 				LOGGER.info("Generate And Persist NFT initiated with org id "+ organization.getId());
 				try {
-					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
-					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+//					PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//					PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
 					immutabilityUtil.fetchAndCreateImmutabilityRecords(jdbcTemplate, 
-							nftBatchSize, networkById, sigmaDocFieldConfigList, organization.getTenantId());
+							nftBatchSize, sigmaDocFieldConfigList, organization.getTenantId());
 				} catch (Exception e) {
 					LOGGER.error("PlatformResource.invokeIRecJobs()", e);
 				}
@@ -915,7 +924,7 @@ public class PlatformResource {
 			executor.shutdown();
 			return new ResponseEntity<>("Immutable Record job initiated successfully !", HttpStatus.OK);
 		}
-
+		
 		/// org
 		@PostMapping(value = "/v1/org")
 		public ResponseEntity<Organization> createOrg(@RequestBody Organization rawOrg) throws Exception {
@@ -1430,7 +1439,7 @@ public class PlatformResource {
 						        
 								InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
 								JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSsingleFile("1", file.getOriginalFilename(),
-										networkById, file);
+										networkById, file, ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
 								String hash = ipfsInfo.optString("createIRec");
 								document.setDocChecksum(hash);		
 							
@@ -2663,9 +2672,7 @@ public class PlatformResource {
 	                    inputHex = inputHex.substring(2);
 	                }
 	                String asciiString = new String(DatatypeConverter.parseHexBinary(inputHex), "UTF-8");
-	                //String unwantedCharactersRegex = "[^\\w\\s-:,.]"; // Matches any character that is not a word character, '-', ':', ',', or '.'
-//	                String unwantedCharactersRegex = "[^\\w\\s:.,-]";
-	                String unwantedCharactersRegex = "[^\\w-:,. ]";
+	                String unwantedCharactersRegex = "[^\\w\\s-:,.]"; // Matches any character that is not a word character, '-', ':', ',', or '.'
 
 	                // Replace unwanted characters with commas
 	                asciiString = asciiString.replaceAll(unwantedCharactersRegex, ",");
@@ -2689,8 +2696,7 @@ public class PlatformResource {
 	        }
 	        
 		}
-		
-		// blocks tx fetch from Algorand
+		// blocks tx fetch from hedera
 		@CrossOrigin(origins = "http://localhost:3000")
 		@GetMapping(value = "/v1/txhedera/{id}", produces = "application/json")
 		@ResponseBody
@@ -2711,73 +2717,52 @@ public class PlatformResource {
 		        LOGGER.error("Error while getting the location risk result.", exception);
 		        throw new Exception("Error while getting the location risk result");
 		    }
-		}		
-		
+		}	
+
 		@Value("${ipfsUrl}")
 	    private String ipfsUrl;
-		@PostMapping(value = "/v1/docfetchprivate/{tenantid}")
-		public ResponseEntity<String> triggerDocumentFetchPrivate(@PathVariable("tenantid") String tenantId,
-				@RequestBody String id) throws Exception {
+		public void populateDocumentDataPrivate() {
+			LOGGER.info("populateDocumentData started ...");
+			
 			try {
+			DocumentRetrieve documentRetrieve = new DocumentRetrieve();
+			OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
+			List<Organization> organizationList = organizationPersistence6.getOrganizationList(jdbcTemplate);
+			for(Organization organization : organizationList) {	
 				JobTriggerPersistence jobtriggerpersistence = new JobTriggerPersistence();
-				boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,tenantId,"DOC_FETCH");
+				boolean jobcurrentstatus = jobtriggerpersistence.getJobManageWithTennat(jdbcTemplate,organization.getTenantId(),"DOC_FETCH");
 				
 				if(!jobcurrentstatus) {
-					LOGGER.info("Exiting the docfetch as it is disabled by flag runDocumentFetchJob {" + jobcurrentstatus + "}");
-					return new ResponseEntity<>("Exiting the docfetch as it is disabled by flag runDocumentFetchJob { !" + jobcurrentstatus + "}", HttpStatus.OK);
+					LOGGER.info("populateDocumentData existed due to flag runFetchJob="+jobcurrentstatus);
+					continue;
 				}
-//				if(!runDocumentFetchJob)
-//				{
-//					LOGGER.info("Exiting the docfetch as it is disabled by flag runDocumentFetchJob {" + runDocumentFetchJob + "}");
-//					return new ResponseEntity<>("Exiting the docfetch as it is disabled by flag runDocumentFetchJob { !" + runDocumentFetchJob + "}", HttpStatus.OK);
-//				}
-				ExecutorService executor = Executors.newFixedThreadPool(10);
-				executor.submit(new Runnable() {					
-					@Override
-					public void run() {		
-				LOGGER.info("populateDocumentData start()");
-				DocumentRetrieve documentRetrieve = new DocumentRetrieve();
-				OrganizationPersistence6 organizationPersistence6 = new OrganizationPersistence6();
-				Organization organizationInfo = organizationPersistence6.getOrganizationInfo(jdbcTemplate, tenantId);
-				
+				SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
+				List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
+						sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, organization.getTenantId());
+				if(sigmaDocFieldConfigList == null || sigmaDocFieldConfigList.isEmpty()) {
+					LOGGER.info("populateDocumentData existed due to sigmaDocFieldConfigList is empty / null");
+					continue;
+				}
+				String tenantId = organization.getTenantId();
 				TenantDocSourcePersistence7 tenantDocSourcePersistence7 = new TenantDocSourcePersistence7();
-				TenantDocSource2 source = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, id);
-			//	List<TenantDocSource2> sources = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
-				//TenantDocSource2 tenantSourceInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
-			//	for(TenantDocSource2 source : sources) {
+				List<TenantDocSource2> organizationList2 = tenantDocSourcePersistence7.getOrganizationList(jdbcTemplate, tenantId);
+				for(TenantDocSource2 source : organizationList2) {
 					if(source.getStatus() != 1)
-					try{
-						throw new Exception("Invalid tenant source configuration !");						
-					}catch(Exception exception) {
-						LOGGER.error("Invalid config ", exception);
-					}
-					SigmaProps props = new SigmaProps(source.getExtUrl()+"/api/v22.3/auth", source.getExtUrl()+"/api/v22.3/query", 
-							source.getExtUserName() , source.getExtPassword(), tenantId, true, source.getExtUrl()+"/api/v22.3/objects/documents/");
-					Organization org = new Organization();
-					org.setTenantId(tenantId);
-					SigmaDocFieldConfigPersistence6  sigmaDocFieldConfigPersistence6 = new SigmaDocFieldConfigPersistence6();
-					List<SigmaAPIDocConfig> sigmaDocFieldConfigList = 
-							sigmaDocFieldConfigPersistence6.getSigmaDocFieldConfigList(jdbcTemplate, org.getTenantId());
-					try {
-							PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
-							PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organizationInfo.getTenantId());
-							documentRetrieve.findLatestDocumentsPrivate(props, jdbcTemplate, organizationInfo, sigmaDocFieldConfigList, networkById,"Yes", ipfsUrl);
-					}catch (Exception e) {
-							LOGGER.error("PlatformResource.triggerDocumentFetch()", e);
-					}
-			//	} // doc source for loop
-					LOGGER.info("populateDocumentData completed ...");
-				} // run method
-					
-				});				
-				executor.shutdown();
-				return new ResponseEntity<>("Successfully started doc fetch !", HttpStatus.OK);
-			} catch (Exception exception) {
-				LOGGER.error("Error while getting the location risk result.", exception);
-				throw new Exception("Error while getting the location risk result");
+						continue;
+				//TenantDocSource2 organizationInfo = tenantDocSourcePersistence7.getOrganizationInfo(jdbcTemplate, "1");
+//				PrivateNetworkPersistence3 privateNetworkPersistence3 = new PrivateNetworkPersistence3();
+//				PrivateNetwork2 networkById = privateNetworkPersistence3.getNetworkByTenant(jdbcTemplate, organization.getTenantId());
+				SigmaProps props = new SigmaProps(source.getExtUrl()+"/api/v22.3/auth", source.getExtUrl()+"/api/v22.3/query", 
+						source.getExtUserName() , source.getExtPassword(), tenantId, true, source.getExtUrl()+"/api/v22.3/objects/documents/");
+	 				documentRetrieve.findLatestDocumentsPrivate(props, jdbcTemplate, organization, sigmaDocFieldConfigList, "No",ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
+				} // tenant doc source
+				} 
 			}
+			catch (Exception e) {
+				LOGGER.error("Application.populateDocumentData()", e);
+			}		
+			LOGGER.info("populateDocumentData completed ...");
 		}
-
-
+		
 	    }
 		

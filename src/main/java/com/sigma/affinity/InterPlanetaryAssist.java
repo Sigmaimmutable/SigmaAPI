@@ -115,7 +115,7 @@ public JSONObject getAndPersistIPFSFile(String docId, String fileName, String se
   	return result;
 }
 public JSONObject getAndPersistIPFSsingleFile(String docId, String fileName, 
-		PrivateNetwork2 networkById,MultipartFile file) throws Exception{ //v tr
+		PrivateNetwork2 networkById,MultipartFile file, String ipfsUrl,String ec2IP1, String ec2IP2, String ec2IP3) throws Exception{ //v tr
 	
 	
 	new HttpConnector(null).skipTrustCertificates(); 
@@ -140,7 +140,7 @@ public JSONObject getAndPersistIPFSsingleFile(String docId, String fileName,
   	  String md5Checksum = calculateMD5Checksum(data);
 
   	  // Use data for createIRec
-  	  createIRec = crateIPFS.createIRecSigma(new ByteArrayInputStream(data), fileName, networkById);
+  	  createIRec = crateIPFS.createIRecSigma(new ByteArrayInputStream(data), fileName, ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
   	    
   	    //createIRec = crateIPFS.createIRec(inputStream, fileName, networkById, sessionId);	
   	    result.put("createIRec", createIRec.optString("Hash"));
@@ -158,7 +158,7 @@ public JSONObject getAndPersistIPFSsingleFile(String docId, String fileName,
 }
 
 public JSONObject getAndPersistIPFSFilePrivate(String docId, String fileName, String sessionId, 
-		PrivateNetwork2 networkById, SigmaProps props, String ipfsUrl) throws Exception{ //v tr
+		SigmaProps props, String ipfsUrl, String ec2IP1, String ec2IP2, String ec2IP3) throws Exception{ //v tr
 	
 	
 	new HttpConnector(null).skipTrustCertificates(); 
@@ -199,7 +199,7 @@ public JSONObject getAndPersistIPFSFilePrivate(String docId, String fileName, St
   	  String md5Checksum = calculateMD5Checksum(data);
 
   	  // Use data for createIRec
-  	  createIRec = crateIPFS.createIRecPrivate(new ByteArrayInputStream(data), fileName, networkById, sessionId, ipfsUrl);
+  	  createIRec = crateIPFS.createIRecPrivate(new ByteArrayInputStream(data), fileName, sessionId, ipfsUrl, ec2IP1, ec2IP2, ec2IP3);
   	    
   	    //createIRec = crateIPFS.createIRec(inputStream, fileName, networkById, sessionId);	
   	    result.put("createIRec", createIRec.optString("cid"));
@@ -219,5 +219,6 @@ public JSONObject getAndPersistIPFSFilePrivate(String docId, String fileName, St
   	 inputStream.close();
   	return result;
 }
+
 }
 

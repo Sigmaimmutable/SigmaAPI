@@ -26,7 +26,6 @@ public class SigmaDocument {
 	private String polyProps;
 	private String md5Checksum;
 	private String txnHash;
-	
 	public String getTxnHash() {
 		return txnHash;
 	}
