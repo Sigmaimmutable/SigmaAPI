@@ -31,6 +31,7 @@ public class SigmaDocumentRowMapper4 implements RowMapper<SigmaDocument> {
     	invoice2.setCreatedDate(rs.getDate("CREATED_DATE"));
     	invoice2.setJobId(rs.getLong("JOB_ID"));//JOB_ID tr
     	invoice2.setMd5Checksum(rs.getString("DOC_MD5CHECKSUM"));
+    	invoice2.setTxnHash(rs.getString("TXN_HASH"));
         return invoice2;
     }
 }

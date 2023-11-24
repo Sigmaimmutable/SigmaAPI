@@ -23,8 +23,8 @@ public class SigmaDocumentPersistence5 {
 			+ "FLEXFIELD_VAR4,FLEXFIELD_VAR5,FLEXFIELD_VAR6,"
 			+ "FLEXFIELD_VAR7,FLEXFIELD_VAR8,FLEXFIELD_VAR9,"
 			+ "FLEXFIELD_VAR10, TENANT_ID,DOC_CHECKSUM,"
-			+ "NFT_CREATION_STATUS,UUID,STATUS,CREATED_BY, JOB_ID, DOC_MD5CHECKSUM) VALUES "
-			+ " (?,?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?)";
+			+ "NFT_CREATION_STATUS,UUID,STATUS,CREATED_BY, JOB_ID, DOC_MD5CHECKSUM, TXN_HASH) VALUES "
+			+ " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	
 	static final String RESOURCE = "SELECT * FROM SIGMA_DOCUMENT  WHERE ID = ?";
 	static final String RESOURCE_BY_TENANT = "SELECT * FROM SIGMA_DOCUMENT  WHERE TENANT_ID = ?  ORDER BY CREATED_DATE DESC LIMIT 20 ";
@@ -36,7 +36,7 @@ public class SigmaDocumentPersistence5 {
 	static final String RESOURCE_ALLSELECT = "SELECT * FROM SIGMA_DOCUMENT LIMIT 100";
 	
 	static final String RESOURCE_UPDATE = "UPDATE SIGMA_DOCUMENT SET "
-			+ "NFT_CREATION_STATUS= ?, UUID=?   WHERE ID = ? ";
+			+ "NFT_CREATION_STATUS= ?, UUID=?, TXN_HASH=?   WHERE ID = ? ";
 	static final String SIGMA_DOC_SUMMARY_BY_MONTH_SQL = "SELECT "
 			+ "NFT_CREATION_STATUS, COUNT(1) DOC_COUNT FROM SIGMA_DOCUMENT WHERE "
 			+ "TENANT_ID = ? AND CREATED_DATE BETWEEN ? AND ? group by NFT_CREATION_STATUS";
@@ -47,7 +47,7 @@ public class SigmaDocumentPersistence5 {
 			if(id == null || id.isEmpty())
 				return 0;			
 			update = jdbcTemplate.update(RESOURCE_UPDATE, resource.getNftCreationStatus(),
-					resource.getUuid(), resource.getSigmaId());				
+					resource.getUuid(), resource.getTxnHash(), resource.getSigmaId());				
 				return update;
 		}catch(Exception exception) {
 			LOGGER.error("Error ResourcePersistence.updateResource() profile", resource, exception);
@@ -62,7 +62,7 @@ public class SigmaDocumentPersistence5 {
 					rs.getfVar2(), rs.getfVar3(), rs.getfVar4(), rs.getfVar5(), rs.getfVar6(),
 					rs.getfVar7(), rs.getfVar8(), rs.getfVar9(), rs.getfVar10(), rs.getTenantId(),
 					rs.getDocChecksum(), rs.getNftCreationStatus(), rs.getUuid(), rs.getStatus(),
-					rs.getCreatedBy(), rs.getJobId(), rs.getMd5Checksum());			
+					rs.getCreatedBy(), rs.getJobId(), rs.getMd5Checksum(), rs.getTxnHash());			
 			return insert;			
 		} catch (Exception exception) {
 			LOGGER.error("Error SigmaDocumentPersistence5.generateDocument() profile", rs, exception);
@@ -168,6 +168,22 @@ public class SigmaDocumentPersistence5 {
 
 		}catch(Exception exception) {
 			LOGGER.error("SigmaDocumentPersistence5.getMonthlyDocumentSummary() ", exception);
+		}
+	}
+	
+	public boolean getDocumentsByDocCheckSum(JdbcTemplate jdbcTemplate, 
+			String tId, String md5) {
+		try {
+			String sqlquery = "SELECT * FROM SIGMA_DOCUMENT  WHERE TENANT_ID = ? AND DOC_MD5CHECKSUM = ?";
+			List<SigmaDocument> resources = jdbcTemplate.query(sqlquery, 
+					new SigmaDocumentRowMapper4(),
+					new Object[] {tId, md5});
+			if(resources == null || resources.isEmpty())
+				return false;		
+		return true;
+		}catch(Exception exception) {
+			LOGGER.error("PaymentPersistence3.getResourceList() ", exception);
+			return false;
 		}
 	}
 
