@@ -1357,7 +1357,8 @@ public class PolygonEdgeUtil {
             RawTransaction rawTransaction = RawTransaction.createTransaction(
             		bigInteger,
             		gasPrice,
-                    DefaultGasProvider.GAS_LIMIT,
+                    // DefaultGasProvider.GAS_LIMIT,
+					BigInteger.valueOf(3_000_000),
                     contractAddress,
                     encodedFunction
 //                    BigInteger.ZERO // Value to send with the transaction (usually "0" for function calls)
@@ -2076,7 +2077,8 @@ public class PolygonEdgeUtil {
             RawTransaction rawTransaction = RawTransaction.createTransaction(
             		bigInteger,
             		gasPrice,
-                    DefaultGasProvider.GAS_LIMIT,
+                    // DefaultGasProvider.GAS_LIMIT,
+					BigInteger.valueOf(3_000_000),
                     contractAddress,
                     encodedFunction
 //                    BigInteger.ZERO // Value to send with the transaction (usually "0" for function calls)
