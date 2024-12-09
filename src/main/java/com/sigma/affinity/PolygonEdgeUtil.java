@@ -1,11 +1,14 @@
 package com.sigma.affinity;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -260,7 +263,7 @@ public class PolygonEdgeUtil {
 		try {
 //		String mintNftUrl = privateNetwork2.getSmartContractAccessUrl()+"contracts"+"/"+ privateNetwork2.getSmartContractAddress() +
 //				"/mintNFT?kld-from="	+ privateNetwork2.getSmartContractDefaultWalletAddress() +"&kld-sync=true";
-		JSONObject nftInfo = new PolygonEdgeUtil().mintNft( 
+		JSONObject nftInfo = new PolygonEdgeUtil().mintNftSui( 
 				documentO, sigmaDocFieldConfigList, infuraUrl, contractAddress, privateKey, chainId, gasPrice, nonceApiUrl); //v
 		return  nftInfo;
 		}catch(Exception exception) {
@@ -312,6 +315,90 @@ public class PolygonEdgeUtil {
 //	//return mintNft(mintNftUrl, userName, password, input);
 //	return mintNftEthereum(mintNftUrl, userName, password, input, infuraUrl, contractAddress, privateKey, chainId, gasPrice, nonceApiUrl);
 //	}
+
+	private JSONObject mintNftSui(
+	        SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String infuraUrl, 
+	        String contractAddress, String privateKey, int chainId, BigInteger gasPrice, String nonceApiUrl) {
+	    JSONObject input = new JSONObject();
+	    UUID uuid = UUID.randomUUID();
+	    String uuidAsString = uuid.toString();
+	    input.put("tokenKey", uuidAsString);
+	    ObjectMapper mapper = new ObjectMapper();
+	    String writeValueAsString = null;
+
+	    try {
+	        writeValueAsString = mapper.writeValueAsString(documentO);
+	    } catch (JsonProcessingException e) {
+	        LOGGER.error("PolygonEdgeUtil.mintNft() error converting SigmaDocument to json documentO{}", documentO, e);
+	        return new JSONObject();
+	    }
+
+	    JSONObject documentOJson = new JSONObject(writeValueAsString);
+	    for (SigmaAPIDocConfig sigmaAPIDocConfig : sigmaDocFieldConfigList) {
+	        String sigmaField = sigmaAPIDocConfig.getSigmaField();
+	        String targetExtField = documentOJson.optString(sigmaField);
+	        input.put(sigmaField, targetExtField);
+	    }
+
+	    int sizeOfInput = sigmaDocFieldConfigList.size() + 1;
+	    for (int counter = sizeOfInput; counter <= 10; counter++) {
+	        input.put("fVar" + counter, "");
+	    }
+
+	    input.put("fVar10", documentO.getDocChecksum());
+	    input.put("fVar11", documentO.getMd5Checksum());
+
+	    try {
+	        // Use HttpURLConnection for the POST request
+	        URL url = new URL("https://sigma-sui-api.vercel.app/mintnft");
+	        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+	        con.setRequestMethod("POST");
+	        con.setRequestProperty("Content-Type", "application/json");
+	        con.setRequestProperty("Accept", "application/json");
+	        con.setDoOutput(true);
+	        con.setFollowRedirects(true);
+
+	        // Write the input JSON to the request body
+	        try (OutputStream os = con.getOutputStream()) {
+	            byte[] inputBytes = input.toString().getBytes(StandardCharsets.UTF_8);
+	            os.write(inputBytes, 0, inputBytes.length);
+	        }
+
+	        // Get the response
+	        int responseCode = con.getResponseCode();
+	        System.out.println("Request Body: " + input.toString());
+	        System.out.println("Response Code : " + responseCode);
+	        System.out.println("Redirect Location: " + con.getHeaderField("Location"));
+
+	        InputStream inputStream = (responseCode < HttpURLConnection.HTTP_BAD_REQUEST) ?
+	                con.getInputStream() : con.getErrorStream();
+
+	        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+	        byte[] buffer = new byte[1024];
+	        int bytesRead;
+	        while ((bytesRead = inputStream.read(buffer)) != -1) {
+	            outputStream.write(buffer, 0, bytesRead);
+	        }
+	        byte[] data = outputStream.toByteArray();
+
+	        String response = new String(data, StandardCharsets.UTF_8);
+	        LOGGER.info("sigma api respone", response);
+
+	        // Add a 2-second delay after the request
+	        Thread.sleep(2000);
+
+	        if (responseCode >= 200 && responseCode < 300) {
+	            JSONObject environmentResponse = new JSONObject();
+	            environmentResponse.put("uuid", input.optString("tokenKey"));
+	            return environmentResponse;
+	        }
+	        return new JSONObject();
+
+	    } catch (Exception e) {
+	        LOGGER.error("Error making POST request: {}", e.getMessage(), e);
+	        return new JSONObject();
+	    }
+	}
 	
 	private JSONObject mintNft(
 			SigmaDocument documentO, List<SigmaAPIDocConfig> sigmaDocFieldConfigList,String infuraUrl,String contractAddress,String privateKey,int chainId,BigInteger gasPrice,String nonceApiUrl) {
