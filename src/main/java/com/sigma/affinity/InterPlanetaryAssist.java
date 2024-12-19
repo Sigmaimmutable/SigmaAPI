@@ -383,7 +383,7 @@ public JSONObject getAndPersistIPFSFileWalrus(JdbcTemplate jdbcTemplate, String 
         result.put("Duplicate", isDuplicate);
 
         // Call createIrecWalrus
-        createIRec = crateIPFS.createIrecWalrus(new ByteArrayInputStream(data), fileName, ipfsUrl, 15);
+        createIRec = crateIPFS.createIrecWalrus(new ByteArrayInputStream(data), fileName, ipfsUrl, 2);
 
         // Handle different responses
         if (createIRec.has("newlyCreated")) {
