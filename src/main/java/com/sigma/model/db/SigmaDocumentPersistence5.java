@@ -79,7 +79,7 @@ public class SigmaDocumentPersistence5 {
 					rs.getfVar2(), rs.getfVar3(), rs.getfVar4(), rs.getfVar5(), rs.getfVar6(),
 					rs.getfVar7(), rs.getfVar8(), rs.getfVar9(), rs.getfVar10(), rs.getTenantId(),
 					rs.getDocChecksum(), rs.getNftCreationStatus(), rs.getUuid(), rs.getStatus(),
-					rs.getCreatedBy(), rs.getJobId(), rs.getMd5Checksum());			
+					rs.getCreatedBy(), rs.getJobId(), rs.getMd5Checksum(), rs.getObjectId());			
 			return insert;			
 		} catch (Exception exception) {
 			LOGGER.error("Error SigmaDocumentPersistence5.generateDocument() profile", rs, exception);
