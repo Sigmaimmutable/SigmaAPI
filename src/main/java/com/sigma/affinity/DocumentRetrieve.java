@@ -199,8 +199,8 @@ public class DocumentRetrieve {
 					document.setNftCreationStatus(0);
 					if(props.getIpfsEnabled()) {
 						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
-						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFilePrivate(document.getfVar6(), document.getfVar1(),
-								sessionId, props,ipfsUrl,ec2IP1, ec2IP2, ec2IP3);
+						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFileWalrus(jdbcTemplate, document.getfVar6(), document.getfVar1(),
+								sessionId, props,ipfsUrl);
 						String hash = ipfsInfo.optString("createIRec");
 						document.setDocChecksum(hash);		
 					

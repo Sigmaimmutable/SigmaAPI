@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -372,7 +373,15 @@ public class PolygonEdgeUtil {
 
 	        InputStream inputStream = (responseCode < HttpURLConnection.HTTP_BAD_REQUEST) ?
 	                con.getInputStream() : con.getErrorStream();
-
+	        
+	        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+	        
+	        String responseBody = reader.lines().collect(Collectors.joining("\n"));
+	        ObjectMapper objectMapper = new ObjectMapper();
+	        JsonNode rootNode = objectMapper.readTree(responseBody);
+	        
+	        System.out.println("Raw Response Body: " + responseBody);
+	        
 	        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 	        byte[] buffer = new byte[1024];
 	        int bytesRead;
@@ -390,6 +399,7 @@ public class PolygonEdgeUtil {
 	        if (responseCode >= 200 && responseCode < 300) {
 	            JSONObject environmentResponse = new JSONObject();
 	            environmentResponse.put("uuid", input.optString("tokenKey"));
+	            environmentResponse.put("objectId", rootNode.get("ObjectId").asText());
 	            return environmentResponse;
 	        }
 	        return new JSONObject();

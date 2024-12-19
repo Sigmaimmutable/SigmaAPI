@@ -10,9 +10,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 import org.json.JSONObject;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.sigma.model.PrivateNetwork2;
+import com.sigma.model.db.SigmaDocumentPersistence5;
 import com.sigma.model.db.SigmaProps;
 
 public class InterPlanetaryAssist {
@@ -325,6 +327,86 @@ public JSONObject getAndPersistIPFSFilePrivate(String docId, String fileName, St
 		throw new Exception ("Error response code from web3 responseCode {}" + responseCode);
   	 inputStream.close();
   	return result;
+}
+
+
+public JSONObject getAndPersistIPFSFileWalrus(JdbcTemplate jdbcTemplate, String docId, String fileName, String sessionId, 
+        SigmaProps props, String ipfsUrl) throws Exception {
+
+    new HttpConnector(null).skipTrustCertificates();
+    URL obj = new URL(props.getExtFileUrl() + docId + "/file");
+    HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+    con.setRequestMethod("GET");
+    con.setRequestProperty("Authorization", sessionId);
+    con.setRequestProperty("Accept", "application/json");
+
+    int responseCode = con.getResponseCode();
+    JSONObject createIRec = null;
+    CrateIPFS crateIPFS = new CrateIPFS();
+    JSONObject result = new JSONObject();
+    InputStream inputStream = null;
+
+    if (responseCode >= 200 && responseCode < 300) {
+        inputStream = con.getInputStream();
+
+        // Perform memory check
+        Runtime runtime = Runtime.getRuntime();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+        double freeSpacePercentage = (double) freeMemory / totalMemory * 100;
+
+        if (freeSpacePercentage < 30.0) {
+            System.gc();
+            System.out.println("Garbage collection triggered.");
+        }
+
+        // Read input stream into byte array
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            byteArrayOutputStream.write(buffer, 0, bytesRead);
+        }
+        byte[] data = byteArrayOutputStream.toByteArray();
+
+        // Calculate MD5 checksum
+        String md5Checksum = calculateMD5Checksum(data);
+        SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
+        boolean isDuplicate = sigmaDocumentPersistence5.getDocumentsByDocCheckSum(jdbcTemplate, props.getTenantId(), md5Checksum);
+
+        if (isDuplicate) {
+            result.put("Duplicate", isDuplicate);
+            con.disconnect();
+            return result;
+        }
+
+        result.put("Duplicate", isDuplicate);
+
+        // Call createIrecWalrus
+        createIRec = crateIPFS.createIrecWalrus(new ByteArrayInputStream(data), fileName, ipfsUrl, 15);
+
+        // Handle different responses
+        if (createIRec.has("newlyCreated")) {
+            JSONObject newlyCreated = createIRec.getJSONObject("newlyCreated");
+            JSONObject blobObject = newlyCreated.getJSONObject("blobObject");
+            result.put("createIRec", blobObject.getString("blobId"));
+        } else if (createIRec.has("alreadyCertified")) {
+            JSONObject alreadyCertified = createIRec.getJSONObject("alreadyCertified");
+            result.put("createIRec", alreadyCertified.getString("blobId"));
+        }
+
+        result.put("md5Checksum", md5Checksum);
+    } else if (responseCode >= 300 && responseCode < 500) {
+        crateIPFS.readErrorStream(con);
+    } else {
+        throw new Exception("Error response code from web3 responseCode {}" + responseCode);
+    }
+
+    if (inputStream != null) {
+        inputStream.close();
+    }
+    con.disconnect();
+    return result;
 }
 
 //public JSONObject getAndPersistIPFSsingleFilePrivate(String docId, String fileName, 

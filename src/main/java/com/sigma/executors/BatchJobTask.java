@@ -91,27 +91,28 @@ public class BatchJobTask implements Callable<String> {
 
 @Override
 	    public String call() throws Exception {
-		  try {
-//			  	LOGGER.info("Thread {"+ Thread.currentThread()+"} printing started privateNetwork2" + privateNetwork2);
-			  	SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
-			  	List<SigmaDocument> pendingDocumentsBySQL = sigmaDocumentPersistence5.getPendingDocumentsBySQL(jdbcTemplate, workSql);
-			  	for(SigmaDocument documentO : pendingDocumentsBySQL) {
-			  		PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
-			  		JSONObject nftInfo = polygonEdgeUtil.mintNftForDocument(documentO, sigmaDocFieldConfigList, infuraurl, contractaddress, privatekey, chainid, gasprice,nonceapiurl);
-			  		documentO.setUuid(nftInfo.optString("uuid"));
-			  		documentO.setNftCreationStatus(1);
-			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+documentO.getSigmaId()+
-			  				", uuid => "+nftInfo.optString("uuid","Error"));
-			  		sigmaDocumentPersistence5.updateImmutableRecord(documentO, jdbcTemplate);
-			  		LOGGER.info("Thread {"+ Thread.currentThread()+"} waiting for next txn ");
-			  		
-			  	}
-			  	LOGGER.info("Thread {"+ Thread.currentThread()+"} printing completed ");
-			  return "Success";
-		} catch (Exception e) {
-			LOGGER.error("BatchJobTask.call() workSql{}", workSql, e);
-			return "Failure";
-		}
+			try {
+	//			  	LOGGER.info("Thread {"+ Thread.currentThread()+"} printing started privateNetwork2" + privateNetwork2);
+						SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
+						List<SigmaDocument> pendingDocumentsBySQL = sigmaDocumentPersistence5.getPendingDocumentsBySQL(jdbcTemplate, workSql);
+						for(SigmaDocument documentO : pendingDocumentsBySQL) {
+							PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
+							JSONObject nftInfo = polygonEdgeUtil.mintNftForDocument(documentO, sigmaDocFieldConfigList, infuraurl, contractaddress, privatekey, chainid, gasprice,nonceapiurl);
+							documentO.setUuid(nftInfo.optString("uuid"));
+							documentO.setObjectId(nftInfo.optString("objectId"));
+							documentO.setNftCreationStatus(1);
+							LOGGER.info("Thread {"+ Thread.currentThread()+"} created NFT for doc id =>  "+documentO.getSigmaId()+
+									", uuid => "+nftInfo.optString("uuid","Error"));
+							sigmaDocumentPersistence5.updateImmutableRecordSui(documentO, jdbcTemplate);
+							LOGGER.info("Thread {"+ Thread.currentThread()+"} waiting for next txn ");
+							
+						}
+						LOGGER.info("Thread {"+ Thread.currentThread()+"} printing completed ");
+					return "Success";
+			} catch (Exception e) {
+				LOGGER.error("BatchJobTask.call() workSql{}", workSql, e);
+				return "Failure";
+			}
 	  }
 	}
 

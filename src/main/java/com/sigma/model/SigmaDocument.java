@@ -25,6 +25,14 @@ public class SigmaDocument {
 	private	Long jobId;
 	private String polyProps;
 	private String md5Checksum;
+	private String objectId;
+	
+	public String getObjectId() {
+		return objectId;
+	}
+	public void setObjectId(String objectId) {
+		this.objectId = objectId;
+	}
 	public String getMd5Checksum() {
 		return md5Checksum;
 	}
