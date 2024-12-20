@@ -1131,12 +1131,12 @@ private String ec2IP3;
 				PolygonEdgeUtil polygonEdgeUtil = new PolygonEdgeUtil();
 				JSONObject immutableRec = null;
 				String uuid = sigmaDocument.getUuid();
-				if(uuid !=null && !uuid.isEmpty()) {
-					immutableRec = polygonEdgeUtil.getImmutableRec(uuid, privateNetwork2, jdbcTemplate);
-					if(immutableRec != null)						
-						//sigmaDocument.setPolyProps(immutableRec.toString());
-						userView.put("polyProps", immutableRec.toString());
-				}
+				// if(uuid !=null && !uuid.isEmpty()) {
+				// 	immutableRec = polygonEdgeUtil.getImmutableRec(uuid, privateNetwork2, jdbcTemplate);
+				// 	if(immutableRec != null)						
+				// 		//sigmaDocument.setPolyProps(immutableRec.toString());
+				// 		userView.put("polyProps", immutableRec.toString());
+				// }
 				return new ResponseEntity<String>(userView.toString(), HttpStatus.OK);
 			} catch (Exception exception) {
 				LOGGER.error("Error while getting the location risk result.", exception);
