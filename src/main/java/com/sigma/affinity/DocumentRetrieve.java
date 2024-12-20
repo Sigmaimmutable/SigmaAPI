@@ -173,78 +173,165 @@ public class DocumentRetrieve {
 //			updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType) ;
 //		}
 //	}
+//	public void findLatestDocumentsPrivate(SigmaProps props, JdbcTemplate jdbcTemplate,
+//			Organization org, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String jobType, String ipfsUrl,String ec2IP1, String ec2IP2, String ec2IP3) throws Exception, JsonProcessingException, JsonMappingException {
+//		String latestDocumentDate = null;
+//		Integer noOfDocuments = 0;
+//		Long jobId = 0l;
+//		try {
+////			UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+////			List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, org.getTenantId(), 5, "23/07/2023");
+//			jobId = updateJobStatus(0, "P",  "", "Started the job !", jdbcTemplate, org, true, 0l, "DOC_FETCH",jobType);
+//			LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() before while");
+//			List<SigmaDocument> docs = new ArrayList<SigmaDocument>();
+//			GenericArtefactRetriever retriever = new VeevaImplementor();
+//			String sessionId = retriever.postAuthenticationToken(props, "sessionId");
+//			props.setSessionId(sessionId);
+//			docs = retriever.findLatestDocuments(props, jdbcTemplate,sigmaDocFieldConfigList,jobType);
+//			SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
+//			int testLimit = 100;
+//			String docupdated_time=null;
+//			for(SigmaDocument document : docs) {
+//				if(document.getfVar7()!=null||!document.getfVar7().isEmpty()) {
+//					document.setTenantId(props.getTenantId());
+//					document.setCreatedBy(org.getCreatedBy());
+//					document.setJobId(jobId);
+//					document.setNftCreationStatus(0);
+//					if(props.getIpfsEnabled()) {
+//						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
+//						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFileWalrus(jdbcTemplate, document.getfVar6(), document.getfVar1(),
+//								sessionId, props,ipfsUrl);
+//						String hash = ipfsInfo.optString("createIRec");
+//						document.setDocChecksum(hash);		
+//					
+//					    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
+//					    document.setMd5Checksum(md5Checksum);
+//					}
+//					sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
+//					noOfDocuments ++;
+//					docupdated_time=document.getfVar7();
+//					if(noOfDocuments > testLimit)
+//						break;	
+//				}
+//				else {
+//					noOfDocuments ++;
+//				}
+//				
+////				LOGGER.info("Persisted the doc {"+document.getId()+"}");						
+//			}
+//		latestDocumentDate=docupdated_time;
+//
+//		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after while noOfDocuments {}"+noOfDocuments, noOfDocuments);
+////		if(latestDocumentDate == null || latestDocumentDate.trim().isEmpty()) {
+////			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+////			Date date = new Date();
+////			String formattedStringData = dateFormat.format(date);
+////			latestDocumentDate = formattedStringData;
+////		}
+//		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() before updateJobStatus ",latestDocumentDate);
+//		updateJobStatus(noOfDocuments, "Y",  latestDocumentDate, "No Errors", jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType);
+//		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after updateJobStatus ", latestDocumentDate);
+//		UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+//		List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, org.getTenantId(), noOfDocuments, latestDocumentDate);
+//
+////		System.out.print("Hello, ");
+////		for (String emailId : emailIds) {
+////		    System.out.printf("%s ", emailId);
+////		}
+//		}catch(Exception exception) {
+//			LOGGER.error("Error HttpURLConnectionUtil.fetchLatestDocuments()", exception);
+//			String stackTrace = exception.getMessage();
+//			if(stackTrace.length()>=4000)
+//				stackTrace = stackTrace.substring(0, 3999);
+//			updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType) ;
+//		}
+//	}
+	
 	public void findLatestDocumentsPrivate(SigmaProps props, JdbcTemplate jdbcTemplate,
-			Organization org, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String jobType, String ipfsUrl,String ec2IP1, String ec2IP2, String ec2IP3) throws Exception, JsonProcessingException, JsonMappingException {
-		String latestDocumentDate = null;
-		Integer noOfDocuments = 0;
-		Long jobId = 0l;
-		try {
-//			UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
-//			List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, org.getTenantId(), 5, "23/07/2023");
-			jobId = updateJobStatus(0, "P",  "", "Started the job !", jdbcTemplate, org, true, 0l, "DOC_FETCH",jobType);
-			LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() before while");
-			List<SigmaDocument> docs = new ArrayList<SigmaDocument>();
-			GenericArtefactRetriever retriever = new VeevaImplementor();
-			String sessionId = retriever.postAuthenticationToken(props, "sessionId");
-			props.setSessionId(sessionId);
-			docs = retriever.findLatestDocuments(props, jdbcTemplate,sigmaDocFieldConfigList,jobType);
-			SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
-			int testLimit = 100;
-			String docupdated_time=null;
-			for(SigmaDocument document : docs) {
-				if(document.getfVar7()!=null||!document.getfVar7().isEmpty()) {
-					document.setTenantId(props.getTenantId());
-					document.setCreatedBy(org.getCreatedBy());
-					document.setJobId(jobId);
-					document.setNftCreationStatus(0);
-					if(props.getIpfsEnabled()) {
-						InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
-						JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFileWalrus(jdbcTemplate, document.getfVar6(), document.getfVar1(),
-								sessionId, props,ipfsUrl);
-						String hash = ipfsInfo.optString("createIRec");
-						document.setDocChecksum(hash);		
-					
-					    String md5Checksum = ipfsInfo.optString("md5Checksum"); // Get the MD5 checksum
-					    document.setMd5Checksum(md5Checksum);
-					}
-					sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
-					noOfDocuments ++;
-					docupdated_time=document.getfVar7();
-					if(noOfDocuments > testLimit)
-						break;	
-				}
-				else {
-					noOfDocuments ++;
-				}
-				
-//				LOGGER.info("Persisted the doc {"+document.getId()+"}");						
-			}
-		latestDocumentDate=docupdated_time;
+	        Organization org, List<SigmaAPIDocConfig> sigmaDocFieldConfigList, String jobType, String ipfsUrl,String ec2IP1, String ec2IP2, String ec2IP3) throws Exception {
+	    String latestDocumentDate = null;
+	    int noOfDocuments = 0;
+	    long jobId = 0L;
+	    try {
+	        jobId = updateJobStatus(0, "P",  "", "Started the job!", jdbcTemplate, org, true, 0L, "DOC_FETCH", jobType);
+	        LOGGER.info("Starting to fetch latest documents...");
 
-		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after while noOfDocuments {}"+noOfDocuments, noOfDocuments);
-//		if(latestDocumentDate == null || latestDocumentDate.trim().isEmpty()) {
-//			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-//			Date date = new Date();
-//			String formattedStringData = dateFormat.format(date);
-//			latestDocumentDate = formattedStringData;
-//		}
-		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() before updateJobStatus ",latestDocumentDate);
-		updateJobStatus(noOfDocuments, "Y",  latestDocumentDate, "No Errors", jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType);
-		LOGGER.info("HttpURLConnectionUtil.fetchLatestDocuments() after updateJobStatus ", latestDocumentDate);
-		UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
-		List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, org.getTenantId(), noOfDocuments, latestDocumentDate);
+	        List<SigmaDocument> docs;
+	        GenericArtefactRetriever retriever = new VeevaImplementor();
+	        String sessionId = retriever.postAuthenticationToken(props, "sessionId");
+	        props.setSessionId(sessionId);
+	        docs = retriever.findLatestDocuments(props, jdbcTemplate, sigmaDocFieldConfigList, jobType);
 
-//		System.out.print("Hello, ");
-//		for (String emailId : emailIds) {
-//		    System.out.printf("%s ", emailId);
-//		}
-		}catch(Exception exception) {
-			LOGGER.error("Error HttpURLConnectionUtil.fetchLatestDocuments()", exception);
-			String stackTrace = exception.getMessage();
-			if(stackTrace.length()>=4000)
-				stackTrace = stackTrace.substring(0, 3999);
-			updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH",jobType) ;
-		}
+	        SigmaDocumentPersistence5 sigmaDocumentPersistence5 = new SigmaDocumentPersistence5();
+	        int testLimit = 99;
+
+	        for (SigmaDocument document : docs) {
+	        	String extension = "";
+	            if (document.getfVar7() != null && !document.getfVar7().isEmpty()) {
+	                document.setTenantId(props.getTenantId());
+	                document.setCreatedBy(org.getCreatedBy());
+	                document.setJobId(jobId);
+	                document.setNftCreationStatus(0);
+	                String DocName = document.getfVar1();
+					int lastDotIndex = DocName.lastIndexOf('.');
+
+			        // Check if there is a dot in the filename
+			        if (lastDotIndex != -1 && lastDotIndex < DocName.length() - 1) {
+			            // Extract the substring after the dot
+			            extension = DocName.substring(lastDotIndex + 1);
+			        }
+			        LOGGER.info("Extension Value: [" + extension + "]");
+			        if (extension != null && extension.trim().equalsIgnoreCase("vob")) {
+			        	LOGGER.info("Skipped Doc...");
+			        	continue;
+			        }
+	                if (props.getIpfsEnabled()) {
+	                    InterPlanetaryAssist interPlanetaryAssist = new InterPlanetaryAssist();
+	                    JSONObject ipfsInfo = interPlanetaryAssist.getAndPersistIPFSFileWalrus(jdbcTemplate, document.getfVar6(), document.getfVar1(),
+	                            sessionId, props, ipfsUrl);
+	                    String duplicateString = ipfsInfo.optString("Duplicate");
+						 boolean isDuplicate = Boolean.parseBoolean(duplicateString);
+								    if(isDuplicate) {
+								    	LOGGER.info("Skipped Loop...");
+								    	continue;
+								    }
+	                    String hash = ipfsInfo.optString("createIRec");
+	                    document.setDocChecksum(hash);
+
+	                    String md5Checksum = ipfsInfo.optString("md5Checksum");
+	                    document.setMd5Checksum(md5Checksum);
+	                }
+
+	                sigmaDocumentPersistence5.generateDocument(document, jdbcTemplate);
+	                noOfDocuments++;
+
+	                latestDocumentDate = document.getfVar7();
+	                if (noOfDocuments >= testLimit) {
+	                    break;
+	                }
+	            }
+	        }
+
+	        LOGGER.info("Total documents processed: {}", noOfDocuments);
+	        updateJobStatus(noOfDocuments, "Y", latestDocumentDate, "No Errors", jdbcTemplate, org, false, jobId, "DOC_FETCH", jobType);
+
+	        UserInfoPersistence userInfoPersistence = new UserInfoPersistence();
+	        List<String> emailIds = userInfoPersistence.getEmailIdsByTennantId(jdbcTemplate, org.getTenantId(), noOfDocuments, latestDocumentDate);
+
+	    } catch (OutOfMemoryError e) {
+	        LOGGER.error("OutOfMemoryError occurred: triggering garbage collection.", e);
+	        System.gc();
+	        updateJobStatus(0, "N", latestDocumentDate, "OutOfMemoryError occurred.", jdbcTemplate, org, false, jobId, "DOC_FETCH", jobType);
+	        throw e;
+	    } catch (Exception exception) {
+	        LOGGER.error("Error fetching latest documents", exception);
+	        String stackTrace = exception.getMessage();
+	        if (stackTrace.length() >= 4000) {
+	            stackTrace = stackTrace.substring(0, 3999);
+	        }
+	        updateJobStatus(0, "N", latestDocumentDate, stackTrace, jdbcTemplate, org, false, jobId, "DOC_FETCH", jobType);
+	        throw exception;
+	    }
 	}
 
 	public Long updateJobStatus(int noOfRecords, String jobRunStatus, 
