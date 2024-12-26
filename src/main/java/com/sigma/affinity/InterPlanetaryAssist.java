@@ -362,7 +362,7 @@ public JSONObject getAndPersistIPFSFileWalrus(JdbcTemplate jdbcTemplate, String 
 
         result.put("Duplicate", false);
         CrateIPFS crateIPFS = new CrateIPFS();
-        JSONObject createIRec = crateIPFS.createIrecWalrus(new ByteArrayInputStream(data), fileName, ipfsUrl, 2);
+        JSONObject createIRec = crateIPFS.createIrecWalrus(new ByteArrayInputStream(data), fileName, ipfsUrl, 10);
 
         if (createIRec.has("newlyCreated")) {
             result.put("createIRec", createIRec.getJSONObject("newlyCreated").getJSONObject("blobObject").getString("blobId"));
