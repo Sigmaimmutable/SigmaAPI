@@ -210,7 +210,7 @@ public class CrateIPFS {
             LOGGER.info("Storing file using Irec Walrus started for file => " + fileName);
 
             String boundary = "------------------------abcdef1234567890";
-            String apiUrl = publisherUrl + "/v1/store?epochs=" + epochs;
+            String apiUrl = publisherUrl + "/v1/blobs?epochs=" + epochs;
 
             HttpURLConnection connection = (HttpURLConnection) new URL(apiUrl).openConnection();
             connection.setRequestMethod("PUT");
