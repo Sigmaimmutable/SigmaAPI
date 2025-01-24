@@ -3111,6 +3111,160 @@ private String ec2IP3;
 	        
 		}
 		
+
+
+		    @PostMapping(value = "/v1/tx/suitxns/{limit}/{cursor}", produces = "application/json")
+		    @ResponseBody
+		    public String getSuiTransactions(
+		            @PathVariable("limit") int limit,
+		            @PathVariable("cursor") String cursor) throws Exception {
+		        try {
+		            RestTemplate restTemplate = new RestTemplate();
+		            
+		            // Define the URL
+		            String url = "https://fullnode.testnet.sui.io:443";
+		            
+		            // Build the JSON payload dynamically
+		            String payload = String.format("""
+		                {
+		                    "jsonrpc": "2.0",
+		                    "id": 1,
+		                    "method": "suix_queryTransactionBlocks",
+		                    "params": [
+		                        {
+		                            "filter": {
+		                                "MoveFunction": {
+		                                    "package": "0x604f7248a1454c44a2e95e363c714d715eada5b5ae41e75fa1ce343e7aee2c25",
+		                                    "module": "sigmanft_two",
+		                                    "function": "mint_to_sender"
+		                                }
+		                            },
+		                            "options": null
+		                        },
+		                        %s,
+		                        %d,
+		                        true
+		                    ]
+		                }
+		            """, cursor.equals("null") ? "null" : "\"" + cursor + "\"", limit);
+		            
+		            // Create headers
+		            HttpHeaders headers = new HttpHeaders();
+		            headers.setContentType(MediaType.APPLICATION_JSON);
+		            
+		            // Create the request entity
+		            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
+		            
+		            // Make the POST request
+		            ResponseEntity<String> responseEntity = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		            
+		            // Check if the response is successful
+		            if (responseEntity.getStatusCode().is2xxSuccessful()) {
+		                return responseEntity.getBody();
+		            } else {
+		                throw new RuntimeException("Failed to fetch data from the Sui API");
+		            }
+		        } catch (Exception exception) {
+		            LOGGER.error("Error while querying Sui transaction blocks.", exception);
+		            throw new Exception("Error while querying Sui transaction blocks");
+		        }
+		    }
+		
+		    @PostMapping(value = "/v1/tx/suitxn/{transactionId}", produces = "application/json")
+		    @ResponseBody
+		    public String getTransactionDetails(@PathVariable("transactionId") String transactionId) throws Exception {
+		        try {
+		            RestTemplate restTemplate = new RestTemplate();
+		            
+		            // Define the URL
+		            String url = "https://fullnode.testnet.sui.io:443";
+		            
+		            // Build the JSON payload dynamically
+		            String payload = String.format("""
+		                {
+		                    "jsonrpc": "2.0",
+		                    "id": 1,
+		                    "method": "sui_getTransactionBlock",
+		                    "params": [
+		                        "%s",
+		                        {
+		                            "showInput": true,
+		                            "showRawInput": false,
+		                            "showEffects": true,
+		                            "showEvents": true,
+		                            "showObjectChanges": false,
+		                            "showBalanceChanges": false,
+		                            "showRawEffects": false
+		                        }
+		                    ]
+		                }
+		            """, transactionId);
+		            
+		            // Create headers
+		            HttpHeaders headers = new HttpHeaders();
+		            headers.setContentType(MediaType.APPLICATION_JSON);
+		            
+		            // Create the request entity
+		            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
+		            
+		            // Make the POST request
+		            ResponseEntity<String> responseEntity = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		            
+		            // Check if the response is successful
+		            if (responseEntity.getStatusCode().is2xxSuccessful()) {
+		                return responseEntity.getBody();
+		            } else {
+		                throw new RuntimeException("Failed to fetch transaction details from the Sui API");
+		            }
+		        } catch (Exception exception) {
+		            LOGGER.error("Error while fetching Sui transaction details.", exception);
+		            throw new Exception("Error while fetching Sui transaction details");
+		        }
+		    }
+		    
+		    @PostMapping(value = "/v1/tx/suiblock/{checkpoint}", produces = "application/json")
+		    @ResponseBody
+		    public String getTransactionBlockDetails(@PathVariable("checkpoint") String checkpoint) throws Exception {
+		        try {
+		            RestTemplate restTemplate = new RestTemplate();
+		            
+		            // Define the URL
+		            String url = "https://fullnode.testnet.sui.io:443";
+		            
+		            // Build the JSON payload dynamically
+		            String payload = String.format("""
+		                {
+						  "jsonrpc": "2.0",
+						  "id": 1,
+						  "method": "sui_getCheckpoint",
+						  "params": [
+						    "%s"
+						  ]
+						}
+		            """, checkpoint);
+		            
+		            // Create headers
+		            HttpHeaders headers = new HttpHeaders();
+		            headers.setContentType(MediaType.APPLICATION_JSON);
+		            
+		            // Create the request entity
+		            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
+		            
+		            // Make the POST request
+		            ResponseEntity<String> responseEntity = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		            
+		            // Check if the response is successful
+		            if (responseEntity.getStatusCode().is2xxSuccessful()) {
+		                return responseEntity.getBody();
+		            } else {
+		                throw new RuntimeException("Failed to fetch block details from the Sui API");
+		            }
+		        } catch (Exception exception) {
+		            LOGGER.error("Error while fetching Sui block details.", exception);
+		            throw new Exception("Error while fetching Sui block details");
+		        }
+		    }
+		
 		
 //		@Value("${ipfsUrl}")
 //	    private String ipfsUrl;
